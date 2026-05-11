@@ -1,0 +1,129 @@
+/* LocationModal.css */
+.loc-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: loc-fade-in 0.2s ease;
+}
+
+@keyframes loc-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.loc-modal {
+  background: #fff;
+  border-radius: 20px;
+  padding: 32px 28px 24px;
+  width: 100%;
+  max-width: 380px;
+  text-align: center;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.18);
+  animation: loc-slide-up 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes loc-slide-up {
+  from { transform: translateY(32px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.loc-modal-icon {
+  width: 64px;
+  height: 64px;
+  background: #E8F5E9;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+}
+
+.loc-modal-icon--blocked {
+  background: #FFF3F3;
+}
+
+.loc-modal-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 12px;
+  font-family: inherit;
+}
+
+.loc-modal-body {
+  font-size: 14px;
+  color: #555;
+  line-height: 1.6;
+  margin: 0 0 20px;
+}
+
+.loc-modal-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #F5F5F5;
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  text-align: left;
+  font-size: 13px;
+  color: #333;
+}
+
+.loc-modal-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #2D6A4F;
+  flex-shrink: 0;
+}
+
+.loc-modal-btn {
+  width: 100%;
+  padding: 15px;
+  border-radius: 14px;
+  border: none;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-bottom: 10px;
+  font-family: inherit;
+}
+
+.loc-modal-btn--primary {
+  background: #2D6A4F;
+  color: white;
+}
+
+.loc-modal-btn--primary:hover {
+  background: #235C43;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(45,106,79,0.35);
+}
+
+.loc-modal-btn--primary:active {
+  transform: translateY(0);
+}
+
+.loc-modal-btn--outline {
+  background: transparent;
+  color: #333;
+  border: 1.5px solid #E0E0E0;
+}
+
+.loc-modal-btn--outline:hover {
+  background: #F5F5F5;
+}
+
+.loc-modal-hint {
+  font-size: 12px;
+  color: #AAA;
+  margin: 4px 0 0;
+}
