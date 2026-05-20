@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/authService';
+import './AuthPage.css';
 
 /* ── tiny inline SVG illustrations ─────────────────────────────── */
-const LeafIcon = () => (
-  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 2C6 2 2 8 2 14s4 6 10 6 10-2 10-8S18 2 12 2z"/>
-    <path d="M12 2c0 6-4 10-4 14"/>
-  </svg>
-);
+// const LeafIcon = () => (
+//   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+//     <path d="M12 2C6 2 2 8 2 14s4 6 10 6 10-2 10-8S18 2 12 2z"/>
+//     <path d="M12 2c0 6-4 10-4 14"/>
+//   </svg>
+// );
 
 const EyeIcon = ({ show }) => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -19,24 +20,24 @@ const EyeIcon = ({ show }) => (
   </svg>
 );
 
-const CheckIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="20 6 9 17 4 12"/>
-  </svg>
-);
+// const CheckIcon = () => (
+//   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+//     <polyline points="20 6 9 17 4 12"/>
+//   </svg>
+// );
 
-const FEATURES = [
-  'Instantly connect waste sellers with certified recyclers',
-  'AI-powered waste verification & fair pricing',
-  'Track transactions end-to-end with full transparency',
-  'Kenya-wide recycler network — growing daily',
-];
+// const FEATURES = [
+//   'Instantly connect waste sellers with certified recyclers',
+//   'AI-powered waste verification & fair pricing',
+//   'Track transactions end-to-end with full transparency',
+//   'Kenya-wide recycler network — growing daily',
+// ];
 
-const STATS = [
-  { val: '2,400+', label: 'kg Recycled' },
-  { val: '180+',   label: 'Active Users' },
-  { val: '95%',    label: 'Match Rate' },
-];
+// const STATS = [
+//   { val: '2,400+', label: 'kg Recycled' },
+//   { val: '180+',   label: 'Active Users' },
+//   { val: '95%',    label: 'Match Rate' },
+// ];
 
 function InputField({ label, type = 'text', value, onChange, placeholder, autoComplete }) {
   const [showPass, setShowPass] = useState(false);
@@ -175,61 +176,67 @@ export default function AuthPage({ onLogin }) {
 
   /* ── LEFT PANEL ─────────────────────────────────────────────── */
   const LeftPanel = () => (
-    <div style={{
-      width: 420, flexShrink: 0,
-      background: 'linear-gradient(160deg, #3A4A24 0%, #4A5830 40%, #5A7040 100%)',
-      padding: '52px 44px',
-      display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-      position: 'relative', overflow: 'hidden',
-    }}>
-      {/* decorative circles */}
-      <div style={{ position: 'absolute', top: -60, right: -60, width: 240, height: 240, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
-      <div style={{ position: 'absolute', bottom: -80, left: -40, width: 300, height: 300, borderRadius: '50%', background: 'rgba(255,255,255,0.03)', pointerEvents: 'none' }} />
+  <div className="hero-wrapper">
 
-      {/* Logo */}
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 52 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <LeafIcon />
-          </div>
-          <div>
-            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, color: '#fff', fontWeight: 700, letterSpacing: '-0.3px' }}>WasteLink</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', letterSpacing: '1.5px', textTransform: 'uppercase', marginTop: 1 }}>Recycling Marketplace</div>
-          </div>
+    <div className="hero-overlay" />
+
+    <div className="hero-content">
+
+      {/* LOGO */}
+      <div className="brand-row">
+
+        <div className="brand-icon">
+          ♻
         </div>
 
-        <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 30, color: '#fff', lineHeight: 1.3, marginBottom: 14, fontWeight: 600 }}>
-          Turning waste into<br />
-          <span style={{ color: '#B5C48A' }}>opportunity.</span>
-        </div>
-        <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.65)', lineHeight: 1.7, marginBottom: 36 }}>
-          Kenya's marketplace connecting waste sellers with certified recyclers — transparently, fairly, and sustainably.
-        </div>
+        <h1>WasteLink</h1>
 
-        {/* Features */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 44 }}>
-          {FEATURES.map((f, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-              <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(181,196,138,0.25)', border: '1px solid rgba(181,196,138,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
-                <CheckIcon />
-              </div>
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.78)', lineHeight: 1.5 }}>{f}</div>
-            </div>
-          ))}
-        </div>
       </div>
 
-      {/* Stats strip */}
-      <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', paddingTop: 24, display: 'flex', gap: 0 }}>
-        {STATS.map((s, i) => (
-          <div key={i} style={{ flex: 1, textAlign: i === 0 ? 'left' : i === 2 ? 'right' : 'center', borderRight: i < 2 ? '1px solid rgba(255,255,255,0.1)' : 'none', paddingRight: i < 2 ? 16 : 0, paddingLeft: i > 0 ? 16 : 0 }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#B5C48A', letterSpacing: '-0.5px' }}>{s.val}</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2, letterSpacing: '0.2px' }}>{s.label}</div>
-          </div>
-        ))}
+      {/* HERO TEXT */}
+      <div className="hero-text">
+
+        <h2>
+          Turn Waste Into
+          <span> Opportunity</span>
+        </h2>
+
+        <p>
+          Kenya's smartest waste recycling marketplace.
+          Connect with verified recyclers and make recycling effortless.
+        </p>
+
       </div>
+
+      {/* FEATURES */}
+      <div className="feature-grid">
+
+        <div className="feature-card">
+          <h3>AI Verification</h3>
+          <p>Computer vision waste analysis</p>
+        </div>
+
+        <div className="feature-card">
+          <h3>Smart Pricing</h3>
+          <p>ML-powered fair prices</p>
+        </div>
+
+        <div className="feature-card">
+          <h3>Local Matching</h3>
+          <p>Find recyclers near you</p>
+        </div>
+
+        <div className="feature-card">
+          <h3>Fast Payments</h3>
+          <p>Secure transactions</p>
+        </div>
+
+      </div>
+
     </div>
-  );
+
+  </div>
+);
 
   /* ── FORGOT PASSWORD ────────────────────────────────────────── */
   if (forgotMode) {

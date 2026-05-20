@@ -5,8 +5,12 @@ import Icon from '../common/Icon';
 import { listingsService } from '../../services/ListingService';
 
 const STEPS = ['Details', 'Upload', 'Done'];
-const CONDITIONS = ['Clean / Sorted', 'Mixed / Unsorted', 'Contaminated', 'Baled / Compressed'];
-
+const CONDITIONS = [
+  { label: 'Clean / Sorted',    value: 'clean'        },
+  { label: 'Mixed / Unsorted',  value: 'mixed'        },
+  { label: 'Contaminated',      value: 'contaminated' },
+  { label: 'Baled / Compressed',value: 'baled'        },
+];
 // ── Convert WASTE_TYPES object → array ────────────────────────────
 // mockData exports: { Plastic: ['PET Bottles', ...], Paper: [...] }
 // We need:          [{ label: 'Plastic', subtypes: [...] }, ...]
@@ -33,7 +37,7 @@ export default function WasteListing({ onNavigate }) {
   const [wasteType, setWasteType] = useState('');
   const [subtype, setSubtype]     = useState('');
   const [qty, setQty]             = useState('');
-  const [condition, setCondition] = useState('Clean / Sorted');
+const [condition, setCondition] = useState('clean');
   const [notes, setNotes]         = useState('');
   const [price, setPrice]         = useState('');
   const [files, setFiles]         = useState([]);
@@ -109,7 +113,7 @@ export default function WasteListing({ onNavigate }) {
 
   function reset() {
     setStep(1); setWasteType(''); setSubtype(''); setQty('');
-    setCondition('Clean / Sorted'); setNotes(''); setPrice('');
+    setCondition('clean'); setNotes(''); setPrice('');
     setFiles([]); setPreviews([]); setCreatedId(null); setError('');
   }
 
@@ -181,7 +185,9 @@ export default function WasteListing({ onNavigate }) {
           <div className="form-group">
             <label className="form-label">Condition</label>
             <select className="form-input" value={condition} onChange={e => setCondition(e.target.value)}>
-              {CONDITIONS.map(c => <option key={c}>{c}</option>)}
+              {CONDITIONS.map(c => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
             </select>
           </div>
 

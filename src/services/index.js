@@ -99,3 +99,14 @@ export const adminService = {
     return api.post('/admin/notify-all', payload);
   },
 };
+
+// ── Map Locations ────────────────────────────────────────────────
+export const locationService = {
+  saveRecyclerLocation(payload) {
+    return api.saveRecyclerLocation(payload);
+  },
+
+  getMyMapLocation() {
+    return api.getMyMapLocation();
+  },
+};
