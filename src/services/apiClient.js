@@ -101,6 +101,18 @@ export const api = {
   delete: (path, opts = {})       => request(path, { method: 'DELETE', ...opts }),
   upload: (path, formData, method = 'POST') =>
     request(path, { method, body: formData }),
+
+    // ── Map Locations ─────────────────────────────────────────────
+  saveRecyclerLocation: (payload) =>
+    request('/map-locations/recycler', {
+      method: 'POST',
+      body: payload,
+    }),
+
+  getMyMapLocation: () =>
+    request('/map-locations/me', {
+      method: 'GET',
+    }),
 };
 
 export default api;

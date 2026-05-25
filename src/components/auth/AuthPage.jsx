@@ -1,15 +1,9 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/authService';
+import './AuthPage.css';
 
-/* ── tiny inline SVG illustrations ─────────────────────────────── */
-const LeafIcon = () => (
-  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 2C6 2 2 8 2 14s4 6 10 6 10-2 10-8S18 2 12 2z"/>
-    <path d="M12 2c0 6-4 10-4 14"/>
-  </svg>
-);
-
+/* ── SVG icons — replaced emoji with clean SVG lines ────────────── */
 const EyeIcon = ({ show }) => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     {show
@@ -19,24 +13,32 @@ const EyeIcon = ({ show }) => (
   </svg>
 );
 
-const CheckIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.85)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="20 6 9 17 4 12"/>
-  </svg>
-);
-
-const FEATURES = [
-  'Instantly connect waste sellers with certified recyclers',
-  'AI-powered waste verification & fair pricing',
-  'Track transactions end-to-end with full transparency',
-  'Kenya-wide recycler network — growing daily',
-];
-
-const STATS = [
-  { val: '2,400+', label: 'kg Recycled' },
-  { val: '180+',   label: 'Active Users' },
-  { val: '95%',    label: 'Match Rate' },
-];
+/* Role card — SVG icon instead of emoji */
+function RoleCard({ id, icon, title, sub, selected, onClick }) {
+  return (
+    <div onClick={onClick} style={{
+      flex: 1, padding: '14px 10px', cursor: 'pointer', textAlign: 'center',
+      border: `2px solid ${selected ? '#1a4731' : '#D8DFC0'}`,
+      borderRadius: 12,
+      background: selected ? '#eef5f1' : '#FAFBF7',
+      transition: 'all .18s',
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+      {selected && (
+        <div style={{ position: 'absolute', top: 8, right: 8, width: 18, height: 18, borderRadius: '50%', background: '#1a4731', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+      )}
+      {/* SVG icon instead of emoji */}
+      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8, color: selected ? '#1a4731' : '#6B7C45' }}>
+        {icon}
+      </div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: selected ? '#1a4731' : '#2C2E1F', marginBottom: 2 }}>{title}</div>
+      <div style={{ fontSize: 11, color: '#8A8E72', lineHeight: 1.4 }}>{sub}</div>
+    </div>
+  );
+}
 
 function InputField({ label, type = 'text', value, onChange, placeholder, autoComplete }) {
   const [showPass, setShowPass] = useState(false);
@@ -45,7 +47,7 @@ function InputField({ label, type = 'text', value, onChange, placeholder, autoCo
 
   return (
     <div style={{ marginBottom: 16 }}>
-      <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#4A5830', marginBottom: 6, letterSpacing: '0.01em' }}>
+      <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#333', marginBottom: 6, letterSpacing: '0.01em' }}>
         {label}
       </label>
       <div style={{ position: 'relative' }}>
@@ -55,20 +57,12 @@ function InputField({ label, type = 'text', value, onChange, placeholder, autoCo
           onChange={onChange}
           placeholder={placeholder}
           autoComplete={autoComplete}
+          className="form-input"
           style={{
-            width: '100%', padding: '11px 14px',
             paddingRight: isPassword ? 42 : 14,
-            borderRadius: 10,
-            border: '1.5px solid #D8DFC0',
-            background: '#FAFBF7',
-            fontSize: 14,
-            color: '#2C2E1F',
-            outline: 'none',
-            transition: 'border .18s, box-shadow .18s',
-            fontFamily: 'inherit',
           }}
-          onFocus={e => { e.target.style.borderColor = '#6B7C45'; e.target.style.boxShadow = '0 0 0 3px rgba(107,124,69,0.12)'; e.target.style.background = '#fff'; }}
-          onBlur={e => { e.target.style.borderColor = '#D8DFC0'; e.target.style.boxShadow = 'none'; e.target.style.background = '#FAFBF7'; }}
+          onFocus={e => { e.target.style.borderColor = '#1a4731'; e.target.style.boxShadow = '0 0 0 3px rgba(26,71,49,0.1)'; e.target.style.background = '#fff'; }}
+          onBlur={e => { e.target.style.borderColor = '#e0ddd6'; e.target.style.boxShadow = 'none'; e.target.style.background = '#fff'; }}
         />
         {isPassword && (
           <button
@@ -79,29 +73,6 @@ function InputField({ label, type = 'text', value, onChange, placeholder, autoCo
           </button>
         )}
       </div>
-    </div>
-  );
-}
-
-function RoleCard({ id, emoji, title, sub, selected, onClick }) {
-  return (
-    <div onClick={onClick} style={{
-      flex: 1, padding: '14px 10px', cursor: 'pointer', textAlign: 'center',
-      border: `2px solid ${selected ? '#6B7C45' : '#D8DFC0'}`,
-      borderRadius: 12,
-      background: selected ? '#EEF2E0' : '#FAFBF7',
-      transition: 'all .18s',
-      position: 'relative',
-      overflow: 'hidden',
-    }}>
-      {selected && (
-        <div style={{ position: 'absolute', top: 8, right: 8, width: 18, height: 18, borderRadius: '50%', background: '#6B7C45', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-        </div>
-      )}
-      <div style={{ fontSize: 26, marginBottom: 6 }}>{emoji}</div>
-      <div style={{ fontSize: 13, fontWeight: 700, color: selected ? '#4A5830' : '#2C2E1F', marginBottom: 2 }}>{title}</div>
-      <div style={{ fontSize: 11, color: '#8A8E72', lineHeight: 1.4 }}>{sub}</div>
     </div>
   );
 }
@@ -165,7 +136,6 @@ export default function AuthPage({ onLogin }) {
       } else if (msg.toLowerCase().includes('invalid') && msg.toLowerCase().includes('password')) {
         setLocalError('Incorrect email or password.');
       } else {
-        // Show the real backend message — it's more accurate than guessing
         setLocalError(msg || 'Something went wrong. Please try again.');
       }
     } finally { setLoading(false); }
@@ -173,60 +143,27 @@ export default function AuthPage({ onLogin }) {
 
   function handleKey(e) { if (e.key === 'Enter') handleSubmit(); }
 
-  /* ── LEFT PANEL ─────────────────────────────────────────────── */
+  /* ── LEFT PANEL — same on both screens for consistency ──────── */
   const LeftPanel = () => (
-    <div style={{
-      width: 420, flexShrink: 0,
-      background: 'linear-gradient(160deg, #3A4A24 0%, #4A5830 40%, #5A7040 100%)',
-      padding: '52px 44px',
-      display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-      position: 'relative', overflow: 'hidden',
-    }}>
-      {/* decorative circles */}
-      <div style={{ position: 'absolute', top: -60, right: -60, width: 240, height: 240, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
-      <div style={{ position: 'absolute', bottom: -80, left: -40, width: 300, height: 300, borderRadius: '50%', background: 'rgba(255,255,255,0.03)', pointerEvents: 'none' }} />
-
-      {/* Logo */}
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 52 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <LeafIcon />
+    <div className="auth-hero">
+      <div className="hero-wrapper">
+        <div className="hero-overlay" />
+        <div className="hero-content">
+          <div className="brand-row">
+            <div className="brand-icon">♻</div>
+            <h1>WasteLink</h1>
           </div>
-          <div>
-            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, color: '#fff', fontWeight: 700, letterSpacing: '-0.3px' }}>WasteLink</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.55)', letterSpacing: '1.5px', textTransform: 'uppercase', marginTop: 1 }}>Recycling Marketplace</div>
+          <div className="hero-text">
+            <h2>Turn Waste Into<span> Opportunity</span></h2>
+            <p>Kenya's smartest waste recycling marketplace. Connect with verified recyclers and make recycling effortless.</p>
+          </div>
+          <div className="feature-grid">
+            <div className="feature-card"><h3>AI Verification</h3><p>Computer vision waste analysis</p></div>
+            <div className="feature-card"><h3>Smart Pricing</h3><p>ML-powered fair prices</p></div>
+            <div className="feature-card"><h3>Local Matching</h3><p>Find recyclers near you</p></div>
+            <div className="feature-card"><h3>Fast Payments</h3><p>Secure transactions</p></div>
           </div>
         </div>
-
-        <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 30, color: '#fff', lineHeight: 1.3, marginBottom: 14, fontWeight: 600 }}>
-          Turning waste into<br />
-          <span style={{ color: '#B5C48A' }}>opportunity.</span>
-        </div>
-        <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.65)', lineHeight: 1.7, marginBottom: 36 }}>
-          Kenya's marketplace connecting waste sellers with certified recyclers — transparently, fairly, and sustainably.
-        </div>
-
-        {/* Features */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 44 }}>
-          {FEATURES.map((f, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-              <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'rgba(181,196,138,0.25)', border: '1px solid rgba(181,196,138,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
-                <CheckIcon />
-              </div>
-              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.78)', lineHeight: 1.5 }}>{f}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Stats strip */}
-      <div style={{ borderTop: '1px solid rgba(255,255,255,0.12)', paddingTop: 24, display: 'flex', gap: 0 }}>
-        {STATS.map((s, i) => (
-          <div key={i} style={{ flex: 1, textAlign: i === 0 ? 'left' : i === 2 ? 'right' : 'center', borderRight: i < 2 ? '1px solid rgba(255,255,255,0.1)' : 'none', paddingRight: i < 2 ? 16 : 0, paddingLeft: i > 0 ? 16 : 0 }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#B5C48A', letterSpacing: '-0.5px' }}>{s.val}</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2, letterSpacing: '0.2px' }}>{s.label}</div>
-          </div>
-        ))}
       </div>
     </div>
   );
@@ -234,21 +171,28 @@ export default function AuthPage({ onLogin }) {
   /* ── FORGOT PASSWORD ────────────────────────────────────────── */
   if (forgotMode) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', background: '#F7F5EE' }}>
+      <div className="auth-page">
         <LeftPanel />
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 48px' }}>
-          <div style={{ width: '100%', maxWidth: 380 }}>
+        <div className="auth-panel">
+          <div className="auth-card">
+            {/* Mobile brand */}
+            <div className="auth-mobile-brand">
+              <div className="auth-mobile-brand-icon">♻</div>
+              <span className="auth-mobile-brand-name">WasteLink</span>
+            </div>
             <button onClick={() => { setForgotMode(false); setForgotSent(false); setForgotEmail(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#8A8E72', fontSize: 13, marginBottom: 32, display: 'flex', alignItems: 'center', gap: 6, padding: 0, fontFamily: 'inherit' }}>
               ← Back to sign in
             </button>
-            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 700, color: '#2C2E1F', marginBottom: 8 }}>Reset your password</div>
+            <div style={{ fontSize: 26, fontWeight: 700, color: '#111', marginBottom: 8 }}>Reset your password</div>
             <div style={{ fontSize: 14, color: '#8A8E72', marginBottom: 32, lineHeight: 1.6 }}>We'll send a secure reset link to your email.</div>
 
             {forgotSent ? (
-              <div style={{ background: '#EEF2E0', border: '1px solid #D4DFB5', borderRadius: 12, padding: '20px 18px', textAlign: 'center' }}>
-                <div style={{ fontSize: 28, marginBottom: 8 }}>📬</div>
-                <div style={{ fontWeight: 700, fontSize: 15, color: '#4A5830', marginBottom: 6 }}>Check your inbox</div>
-                <div style={{ fontSize: 13, color: '#6B7C45', lineHeight: 1.5 }}>A reset link has been sent to <strong>{forgotEmail}</strong></div>
+              <div style={{ background: '#eef5f1', border: '1px solid #c3dece', borderRadius: 12, padding: '20px 18px', textAlign: 'center' }}>
+                <div style={{ marginBottom: 8, color: '#1a4731', display: 'flex', justifyContent: 'center' }}>
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                </div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: '#1a4731', marginBottom: 6 }}>Check your inbox</div>
+                <div style={{ fontSize: 13, color: '#5a7a60', lineHeight: 1.5 }}>A reset link has been sent to <strong>{forgotEmail}</strong></div>
               </div>
             ) : (
               <>
@@ -265,19 +209,25 @@ export default function AuthPage({ onLogin }) {
 
   /* ── MAIN AUTH ──────────────────────────────────────────────── */
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', background: '#F7F5EE' }}>
+    <div className="auth-page">
       <LeftPanel />
 
       {/* Right panel */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 48px', overflowY: 'auto' }}>
-        <div style={{ width: '100%', maxWidth: 400 }}>
+      <div className="auth-panel">
+        <div className="auth-card">
+
+          {/* Mobile brand — only shows on small screens */}
+          <div className="auth-mobile-brand">
+            <div className="auth-mobile-brand-icon">♻</div>
+            <span className="auth-mobile-brand-name">WasteLink</span>
+          </div>
 
           {/* Heading */}
           <div style={{ marginBottom: 28 }}>
-            <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 28, fontWeight: 700, color: '#2C2E1F', marginBottom: 6, letterSpacing: '-0.3px' }}>
+            <div style={{ fontSize: 28, fontWeight: 700, color: '#111', marginBottom: 6, letterSpacing: '-0.3px' }}>
               {mode === 'login' ? 'Welcome back' : 'Create account'}
             </div>
-            <div style={{ fontSize: 14, color: '#8A8E72' }}>
+            <div style={{ fontSize: 14, color: '#888' }}>
               {mode === 'login'
                 ? 'Sign in to your WasteLink account'
                 : "Join Kenya's recycling marketplace today"}
@@ -285,18 +235,9 @@ export default function AuthPage({ onLogin }) {
           </div>
 
           {/* Mode toggle */}
-          <div style={{ display: 'flex', gap: 0, background: '#EEEBE0', padding: 4, borderRadius: 12, marginBottom: 28 }}>
+          <div className="tabs">
             {[['login', 'Sign In'], ['signup', 'Create Account']].map(([m, l]) => (
-              <button key={m} onClick={() => switchMode(m)} style={{
-                flex: 1, padding: '9px 12px', borderRadius: 9, border: 'none',
-                background: mode === m ? '#fff' : 'transparent',
-                color: mode === m ? '#4A5830' : '#8A8E72',
-                fontWeight: mode === m ? 700 : 500,
-                fontSize: 13, cursor: 'pointer',
-                boxShadow: mode === m ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
-                transition: 'all .18s',
-                fontFamily: 'inherit',
-              }}>
+              <button key={m} onClick={() => switchMode(m)} className={`tab${mode === m ? ' active' : ''}`}>
                 {l}
               </button>
             ))}
@@ -305,10 +246,24 @@ export default function AuthPage({ onLogin }) {
           {/* Role selector (signup only) */}
           {mode === 'signup' && (
             <div style={{ marginBottom: 20 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#4A5830', marginBottom: 10 }}>I am a…</div>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#333', marginBottom: 10 }}>I am a…</div>
               <div style={{ display: 'flex', gap: 10 }}>
-                <RoleCard id="seller"   emoji="🌿" title="Waste Seller"  sub="I generate waste to sell"    selected={role === 'seller'}   onClick={() => setRole('seller')} />
-                <RoleCard id="recycler" emoji="♻️" title="Recycler"      sub="I collect & process waste"   selected={role === 'recycler'} onClick={() => setRole('recycler')} />
+                <RoleCard
+                  id="seller"
+                  icon={<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>}
+                  title="Waste Seller"
+                  sub="I generate waste to sell"
+                  selected={role === 'seller'}
+                  onClick={() => setRole('seller')}
+                />
+                <RoleCard
+                  id="recycler"
+                  icon={<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>}
+                  title="Recycler"
+                  sub="I collect & process waste"
+                  selected={role === 'recycler'}
+                  onClick={() => setRole('recycler')}
+                />
               </div>
             </div>
           )}
@@ -345,25 +300,30 @@ export default function AuthPage({ onLogin }) {
 
           {/* Forgot password */}
           {mode === 'login' && (
-            <button onClick={() => setForgotMode(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#6B7C45', fontSize: 13, fontWeight: 500, display: 'block', textAlign: 'center', width: '100%', marginTop: 14, fontFamily: 'inherit' }}>
+            <button onClick={() => setForgotMode(true)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#1a4731', fontSize: 13, fontWeight: 500, display: 'block', textAlign: 'center', width: '100%', marginTop: 14, fontFamily: 'inherit' }}>
               Forgot your password?
             </button>
           )}
 
           {/* Admin hint */}
-          <div style={{ marginTop: 28, padding: '12px 14px', background: 'rgba(107,124,69,0.07)', borderRadius: 10, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-            <span style={{ fontSize: 16, flexShrink: 0 }}>🛡️</span>
-            <div style={{ fontSize: 12, color: '#6B7C45', lineHeight: 1.5 }}>
+          <div style={{ marginTop: 28, padding: '12px 14px', background: '#f0f4f1', border: '1px solid #d8e5dc', borderRadius: 10, display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+            <div style={{ flexShrink: 0, marginTop: 1, color: '#1a4731' }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+            </div>
+            <div style={{ fontSize: 12, color: '#3a5a40', lineHeight: 1.5 }}>
               <strong>Admin access</strong> is assigned via the database. Log in with your admin email and your role is applied automatically.
             </div>
           </div>
+
         </div>
       </div>
     </div>
   );
 }
 
-/* ── Shared sub-components ──────────────────────────────────────── */
+/* ── Shared sub-components — unchanged from original ────────────── */
 function ErrorBanner({ msg }) {
   return (
     <div style={{
@@ -372,7 +332,10 @@ function ErrorBanner({ msg }) {
       fontSize: 13, color: '#7A5000',
       marginBottom: 16, display: 'flex', alignItems: 'flex-start', gap: 8,
     }}>
-      <span style={{ flexShrink: 0, fontSize: 15 }}>⚠️</span>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{flexShrink:0,marginTop:1}}>
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
       <span>{msg}</span>
     </div>
   );
@@ -386,7 +349,7 @@ function SubmitButton({ loading, onClick, label, onKeyDown }) {
       disabled={loading}
       style={{
         width: '100%', padding: '13px 20px',
-        background: loading ? '#8A9B5E' : 'linear-gradient(135deg, #4A5830 0%, #6B7C45 100%)',
+        background: loading ? '#7a9e8c' : 'linear-gradient(135deg, #1a4731 0%, #2d7a52 100%)',
         color: '#fff',
         border: 'none', borderRadius: 12,
         fontSize: 15, fontWeight: 700,
@@ -395,10 +358,10 @@ function SubmitButton({ loading, onClick, label, onKeyDown }) {
         fontFamily: 'inherit',
         letterSpacing: '0.01em',
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-        boxShadow: loading ? 'none' : '0 4px 14px rgba(74,88,48,0.3)',
+        boxShadow: loading ? 'none' : '0 4px 14px rgba(26,71,49,0.28)',
       }}
-      onMouseEnter={e => { if (!loading) e.target.style.transform = 'translateY(-1px)'; }}
-      onMouseLeave={e => { e.target.style.transform = 'translateY(0)'; }}
+      onMouseEnter={e => { if (!loading) e.currentTarget.style.transform = 'translateY(-1px)'; }}
+      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; }}
     >
       {loading ? (
         <>
