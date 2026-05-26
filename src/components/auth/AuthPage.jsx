@@ -3,6 +3,8 @@ import { useAuth } from '../../context/AuthContext';
 import { authService } from '../../services/authService';
 import './AuthPage.css';
 
+
+
 /* ── SVG icons — replaced emoji with clean SVG lines ────────────── */
 const EyeIcon = ({ show }) => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -77,7 +79,7 @@ function InputField({ label, type = 'text', value, onChange, placeholder, autoCo
   );
 }
 
-export default function AuthPage({ onLogin }) {
+export default function AuthPage({ onLogin, onNavigate  }) {
   const { login, register, setError } = useAuth();
 
   const [mode, setMode]             = useState('login');
@@ -157,12 +159,60 @@ export default function AuthPage({ onLogin }) {
             <h2>Turn Waste Into<span> Opportunity</span></h2>
             <p>Kenya's smartest waste recycling marketplace. Connect with verified recyclers and make recycling effortless.</p>
           </div>
+          
+          <button 
+  className="how-it-works-btn"
+  onClick={() => onNavigate('how-it-works')}
+>
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"/>
+    <line x1="12" y1="8" x2="12" y2="12"/>
+    <line x1="12" y1="16" x2="12.01" y2="16"/>
+  </svg>
+  How It Works
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="5" y1="12" x2="19" y2="12"/>
+    <polyline points="12 5 19 12 12 19"/>
+  </svg>
+</button>
           <div className="feature-grid">
-            <div className="feature-card"><h3>AI Verification</h3><p>Computer vision waste analysis</p></div>
-            <div className="feature-card"><h3>Smart Pricing</h3><p>ML-powered fair prices</p></div>
-            <div className="feature-card"><h3>Local Matching</h3><p>Find recyclers near you</p></div>
-            <div className="feature-card"><h3>Fast Payments</h3><p>Secure transactions</p></div>
-          </div>
+      <div className="feature-card">
+        <div className="feature-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#39d98a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+          </svg>
+        </div>
+        <h3>AI Verification</h3>
+        <p>Waste analysis with confidence scoring</p>
+      </div>
+      <div className="feature-card">
+        <div className="feature-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#39d98a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+          </svg>
+        </div>
+        <h3>Smart Pricing</h3>
+        <p>ML-powered fair market prices in real time</p>
+      </div>
+      <div className="feature-card">
+        <div className="feature-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#39d98a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
+          </svg>
+        </div>
+        <h3>Local Matching</h3>
+        <p>Find verified recyclers near you instantly</p>
+      </div>
+      <div className="feature-card">
+        <div className="feature-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#39d98a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+          </svg>
+        </div>
+        <h3>Fast Payments</h3>
+        <p>Secure M-Pesa & bank transactions</p>
+      </div>
+    </div>
         </div>
       </div>
     </div>
@@ -213,7 +263,7 @@ export default function AuthPage({ onLogin }) {
       <LeftPanel />
 
       {/* Right panel */}
-      <div className="auth-panel">
+      <div className={`auth-panel${mode === 'signup' ? ' scrollable' : ''}`}>
         <div className="auth-card">
 
           {/* Mobile brand — only shows on small screens */}
