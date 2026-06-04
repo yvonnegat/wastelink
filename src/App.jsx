@@ -17,6 +17,8 @@ import VisionModule  from './components/vision/VisionModule';
 import PricingModule from './components/pricing/PricingModule';
 import MapModule     from './components/map/MapModule';
 import Transactions  from './components/transactions/Transactions';
+import HowItWorks from "./components/HowItWorks";
+
 
 import './styles/global.css';
 import 'leaflet/dist/leaflet.css';
@@ -85,7 +87,10 @@ function AppShell() {
 
   // ── Auth gate ─────────────────────────────────────────────────
   if (!user) {
-    return <AuthPage onLogin={handleLogin} />;
+    if (page === 'how-it-works') {
+    return <HowItWorks onBack={() => setPage('login')} />;
+  }
+    return <AuthPage onLogin={handleLogin}onNavigate={setPage}/>;
   }
 
   // ── Guard: admins always see admin panel ──────────────────────

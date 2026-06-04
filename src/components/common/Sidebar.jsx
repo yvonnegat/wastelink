@@ -1,5 +1,6 @@
 import React from 'react';
 import Icon from '../common/Icon';
+import logo from '../../assets/logo.png';
 
 const NAV_SELLER = [
   { id: 'dashboard',    label: 'Dashboard',        icon: 'home' },
@@ -42,11 +43,14 @@ export default function Sidebar({ activePage, onNavigate, user }) {
     .toUpperCase();
 
   return (
-    <aside className="sidebar">
-      <div>
-        <div className="logo-icon"><Icon name="leaf" size={20} /></div>
-        <div className="logo-text">WasteLink</div>
-        <div className="logo-sub">RECYCLING MARKETPLACE</div>
+  <aside className="sidebar">
+    <div>
+      <div className="sidebar-logo" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <img src={logo} alt="WasteLink" style={{ width: '42px', height: '42px' }} />
+        <div>
+          <div className="logo-text">WasteLink</div>
+          <div className="logo-sub">RECYCLING MARKETPLACE</div>
+        </div>
       </div>
 
       <nav className="nav">
@@ -63,21 +67,22 @@ export default function Sidebar({ activePage, onNavigate, user }) {
           </button>
         ))}
       </nav>
+    </div>
 
-      <div className="sidebar-user">
-        {user?.avatar_url ? (
-          <img src={user.avatar_url} alt={displayName}
-            style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
-        ) : (
-          <div className="user-avatar">{initials}</div>
-        )}
-        <div>
-          <div className="user-name">{displayName}</div>
-          <span className={`role-badge ${role === 'recycler' ? 'role-recycler' : role === 'admin' ? 'role-admin' : 'role-seller'}`}>
-            {role}
-          </span>
-        </div>
+    <div className="sidebar-user">
+      {user?.avatar_url ? (
+        <img src={user.avatar_url} alt={displayName}
+          style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+      ) : (
+        <div className="user-avatar">{initials}</div>
+      )}
+      <div>
+        <div className="user-name">{displayName}</div>
+        <span className={`role-badge ${role === 'recycler' ? 'role-recycler' : role === 'admin' ? 'role-admin' : 'role-seller'}`}>
+          {role}
+        </span>
       </div>
-    </aside>
-  );
+    </div>
+  </aside>
+);
 }
