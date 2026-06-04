@@ -7,3 +7,6 @@ node_modules/
 .env.production
 .env.development
 .env.*.local   
+
+# Cache files
+.cache/

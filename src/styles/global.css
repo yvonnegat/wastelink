@@ -2,22 +2,22 @@
 
 /* ── DESIGN TOKENS ─────────────────────────────────────────────── */
 :root {
-  --olive: #6B7C45;
-  --olive-light: #8A9B5E;
-  --olive-pale: #B5C48A;
-  --olive-muted: #D4DFB5;
-  --olive-bg: #EEF2E0;
-  --olive-deep: #4A5830;
-  --cream: #F7F5EE;
-  --cream2: #EEEBE0;
-  --text: #2C2E1F;
-  --text2: #5A5E42;
-  --text3: #8A8E72;
+  --olive: #1a6b3a;
+  --olive-light: #22874a;
+  --olive-pale: #4caf72;
+  --olive-muted: #a8d5b8;
+  --olive-bg: #e8f5ee;
+  --olive-deep: #0d3d20;
+  --cream: #f4faf6;
+  --cream2: #eaf4ef;
+  --text: #0d1f14;
+  --text2: #2e5c3e;
+  --text3: #5a8a6e;
   --white: #FFFFFF;
-  --border: #D8DFC0;
-  --border2: #C2CCA0;
-  --shadow: 0 2px 12px rgba(107, 124, 69, 0.12);
-  --shadow-lg: 0 8px 32px rgba(107, 124, 69, 0.18);
+  --border: #b8ddc8;
+  --border2: #8fc4a8;
+  --shadow: 0 2px 12px rgba(26, 107, 58, 0.12);
+  --shadow-lg: 0 8px 32px rgba(26, 107, 58, 0.18);
   --r: 12px;
   --r2: 8px;
   --r3: 20px;
@@ -98,7 +98,7 @@ input, select, textarea { font-family: inherit; }
   transition: all 0.2s;
   border: none;
 }
-.btn-primary  { background: var(--olive); color: white; }
+.btn-primary  {  background: #1e8449;  color: white; }
 .btn-primary:hover { background: var(--olive-deep); }
 .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 .btn-secondary { background: var(--olive-bg); color: var(--olive-deep); border: 1px solid var(--border); }
@@ -386,7 +386,7 @@ input, select, textarea { font-family: inherit; }
 /* sidebar */
 .sidebar {
   width: 240px;
-  background: #5f6f52;
+  background:#0D3D20;
   color: white;
   display: flex;
   flex-direction: column;
@@ -396,29 +396,32 @@ input, select, textarea { font-family: inherit; }
 
 /* logo block */
 .sidebar-logo {
-  margin-bottom: 30px;
+  margin-bottom: 8px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 
 .logo-icon {
   width: 42px;
   height: 42px;
-  background: #e8f0e6;
+  background: #e8f5ee;
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
 }
 
 .logo-text {
-  margin-top: 10px;
-  font-size: 18px;
+  margin-top: 0px;
+  font-size: 17px;
   font-weight: 600;
 }
 
 .logo-sub {
-  font-size: 11px;
-  opacity: 0.65;
-  letter-spacing: 0.5px;
+  font-size: 10px;
+  opacity: 0.5;
+  letter-spacing: 0.8px;
 }
 
 /* nav */
