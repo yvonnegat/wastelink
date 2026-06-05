@@ -1,5 +1,7 @@
 import api from './apiClient';
+import * as _loc from './locationService';
 
+export const locationService = _loc;
 // ── Transactions ──────────────────────────────────────────────────
 export const transactionsService = {
   getAll(params = {}) {
@@ -69,7 +71,6 @@ export const recyclersService = {
 // ── Admin ─────────────────────────────────────────────────────────
 export const adminService = {
   getStats()   { return api.get('/admin/stats'); },
-
   getUsers(params = {}) {
     const q = new URLSearchParams(params).toString();
     return api.get(`/admin/users${q ? `?${q}` : ''}`);
@@ -77,36 +78,42 @@ export const adminService = {
   getUserById(id)      { return api.get(`/admin/users/${id}`); },
   updateUser(id, data) { return api.patch(`/admin/users/${id}`, data); },
   deleteUser(id)       { return api.delete(`/admin/users/${id}`); },
-
   getListings(params = {}) {
     const q = new URLSearchParams(params).toString();
     return api.get(`/admin/listings${q ? `?${q}` : ''}`);
   },
   verifyListing(id, payload) { return api.patch(`/admin/listings/${id}/verify`, payload); },
   deleteListing(id)           { return api.delete(`/admin/listings/${id}`); },
-
   getTransactions(params = {}) {
     const q = new URLSearchParams(params).toString();
     return api.get(`/admin/transactions${q ? `?${q}` : ''}`);
   },
-
   getAuditLogs(params = {}) {
     const q = new URLSearchParams(params).toString();
     return api.get(`/admin/audit-logs${q ? `?${q}` : ''}`);
   },
-
   broadcastNotification(payload) {
     return api.post('/admin/notify-all', payload);
   },
 };
 
-// ── Map Locations ────────────────────────────────────────────────
-export const locationService = {
-  saveRecyclerLocation(payload) {
-    return api.saveRecyclerLocation(payload);
-  },
+// ── Map / Location ────────────────────────────────────────────────
+// Re-export the real functions directly from locationService.js
+// so that { locationService } from '../../services' works correctly.
+export {
+  fetchMapLocations,
+  fetchLocationsByRole,
+  saveRecyclerLocation,
+  saveWasteGeneratorLocation,
+  deactivateLocation,
+  getMyLocation,
+  geocodeAddress,
+  reverseGeocode,
+  findNearbySeededCentre,
+  claimSeededCentre,
+  updateClaimedCentre,
+} from './locationService';
 
-  getMyMapLocation() {
-    return api.getMyMapLocation();
-  },
-};
+// Also export as a named object for files that do:
+// import { locationService } from '../../services'
+
