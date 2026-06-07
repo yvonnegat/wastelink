@@ -413,3 +413,157 @@ textarea.form-input { resize: vertical; min-height: 88px; }
   .field-grid { grid-template-columns: 1fr; }
   .field-item.full-col { grid-column: 1; }
 }
+/* Add these to your existing ProfilePage.css */
+
+/* ── Visibility banner ─────────────────────────────────────── */
+.visibility-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  background: #fff8e1;
+  border: 1.5px solid #f59e0b;
+  border-radius: 12px;
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: #78350f;
+  flex-wrap: wrap;
+}
+.visibility-banner.visible {
+  background: #e8f4ee;
+  border-color: #1a4731;
+  color: #1a4731;
+}
+.visibility-banner strong { font-weight: 700; }
+.visibility-banner span   { color: inherit; opacity: .85; }
+
+/* ── Section hint ──────────────────────────────────────────── */
+.section-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 13px;
+  color: #888;
+  margin: 0 0 14px;
+  line-height: 1.5;
+}
+
+/* ── Role badge ────────────────────────────────────────────── */
+.badge-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.badge-role.recycler {
+  background: #e8f4ee;
+  color: #1a4731;
+}
+.badge-role.seller {
+  background: #fff3e0;
+  color: #92400e;
+}
+
+/* ── Quick stat icon colours ───────────────────────────────── */
+.quick-stat-icon.green { color: #1a4731; background: #e8f4ee; }
+.quick-stat-icon.amber { color: #e07b2a; background: #fff3e0; }
+
+/* ── btn-sm ────────────────────────────────────────────────── */
+.btn-sm { padding: 7px 14px !important; font-size: 12px !important; }
+/* ── Profile page header layout ─────────────────────────────── */
+.profile-page-hd {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.profile-page-hd-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ── Logout button ───────────────────────────────────────────── */
+.logout-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid #e2ebe5;
+  background: white;
+  color: #6b7f74;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.logout-btn:hover {
+  border-color: #e05252;
+  color: #c0392b;
+  background: #fff5f5;
+}
+
+/* ── Compact visibility banner ───────────────────────────────── */
+.visibility-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid #f5d99a;
+  background: #fffbf0;
+  font-size: 13.5px;
+  color: #6b4f0a;
+  margin-bottom: 4px;
+}
+
+.visibility-banner.visible {
+  border-color: #b6dfc6;
+  background: #f2fbf5;
+  color: #1a4731;
+}
+
+/* Pulsing status dot */
+.vis-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.vis-dot--warn {
+  background: #e6a817;
+  box-shadow: 0 0 0 0 rgba(230, 168, 23, 0.4);
+  animation: pulse-warn 2s infinite;
+}
+
+.vis-dot--live {
+  background: #1a7a4a;
+  box-shadow: 0 0 0 0 rgba(26, 122, 74, 0.4);
+  animation: pulse-live 2s infinite;
+}
+
+@keyframes pulse-warn {
+  0%   { box-shadow: 0 0 0 0 rgba(230, 168, 23, 0.4); }
+  70%  { box-shadow: 0 0 0 6px rgba(230, 168, 23, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(230, 168, 23, 0); }
+}
+
+@keyframes pulse-live {
+  0%   { box-shadow: 0 0 0 0 rgba(26, 122, 74, 0.4); }
+  70%  { box-shadow: 0 0 0 6px rgba(26, 122, 74, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(26, 122, 74, 0); }
+}
+
+.visibility-banner .btn-primary.btn-sm {
+  margin-left: auto;
+  flex-shrink: 0;
+}

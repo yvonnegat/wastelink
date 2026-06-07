@@ -1,215 +1,333 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import Select from 'react-select';
+import {
+  Building2, Phone, Mail, User, MapPin, Clock, Star,
+  Camera, Edit2, Lock, Bell, Trash2, Calendar, Check, X,
+  Recycle, Package, FileText, Globe, ChevronDown, AlertCircle,
+  LogOut
+} from 'lucide-react';
 
 import { useAuth } from '../../context/AuthContext';
 import { usersService, locationService } from '../../services';
-import { Spinner } from '../common';
 import LocationAutocomplete from '../map/LocationAutocomplete';
+import { NearbySeededCentrePrompt } from '../map/NearbySeededCentrePrompt';
+import { useToast } from '../common/Toast';
 
 import './ProfilePage.css';
 
-// ── Inline SVG icons ─────────────────────────────────────────────
-const Icon = ({ name, size = 16 }) => {
-  const icons = {
-    building: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 21h18M9 8h1M9 12h1M9 16h1M14 8h1M14 12h1M14 16h1M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"/></svg>,
-    recycle: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5"/><path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12"/><path d="m14 16-3 3 3 3"/><path d="M8.293 13.596 7.196 9.5 3.1 10.598"/><path d="m9.344 5.811 1.093-1.892A1.83 1.83 0 0 1 11.985 3a1.784 1.784 0 0 1 1.546.888l3.943 6.843"/><path d="m13.378 9.633 4.096 1.098 1.097-4.096"/></svg>,
-    map: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>,
-    pin: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>,
-    clock: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
-    star: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
-    camera: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>,
-    edit: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
-    lock: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
-    bell: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
-    trash: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>,
-    calendar: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
-    check: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
-    x: <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
-  };
-  return icons[name] || null;
-};
-
-const wasteIconName = (t) =>
-  ({ Plastic: 'recycle', Metal: 'recycle', Paper: 'recycle', Glass: 'recycle', Electronics: 'recycle', Organic: 'recycle', Textiles: 'recycle' }[t] || 'recycle');
-
+// ─── Options ──────────────────────────────────────────────────
 const wasteOptions = [
-  { value: 'Plastic', label: 'Plastic' },
-  { value: 'Paper', label: 'Paper' },
-  { value: 'Glass', label: 'Glass' },
-  { value: 'Metal', label: 'Metal' },
-  { value: 'Electronics', label: 'Electronics' },
-  { value: 'Organic', label: 'Organic' },
-  { value: 'Textiles', label: 'Textiles' },
+  { value: 'Plastic',     label: 'Plastic' },
+  { value: 'Paper',       label: 'Paper' },
+  { value: 'Cardboard',   label: 'Cardboard' },
+  { value: 'Glass',       label: 'Glass' },
+  { value: 'Metal',       label: 'Metal' },
+  { value: 'E-Waste',     label: 'E-Waste' },
+  { value: 'Organic',     label: 'Organic' },
+  { value: 'Textiles',    label: 'Textiles' },
+  { value: 'Tyres',       label: 'Tyres' },
+  { value: 'Batteries',   label: 'Batteries' },
 ];
 
 const dayOptions = [
-  { value: 'Monday', label: 'Monday' },
-  { value: 'Tuesday', label: 'Tuesday' },
+  { value: 'Monday',    label: 'Monday' },
+  { value: 'Tuesday',   label: 'Tuesday' },
   { value: 'Wednesday', label: 'Wednesday' },
-  { value: 'Thursday', label: 'Thursday' },
-  { value: 'Friday', label: 'Friday' },
-  { value: 'Saturday', label: 'Saturday' },
-  { value: 'Sunday', label: 'Sunday' },
+  { value: 'Thursday',  label: 'Thursday' },
+  { value: 'Friday',    label: 'Friday' },
+  { value: 'Saturday',  label: 'Saturday' },
+  { value: 'Sunday',    label: 'Sunday' },
 ];
 
-const DAY_ABBR = { Monday:'Mo', Tuesday:'Tu', Wednesday:'We', Thursday:'Th', Friday:'Fr', Saturday:'Sa', Sunday:'Su' };
-
-const selectStyles = {
-  control: (b) => ({ ...b, borderColor: '#e2ebe5', borderRadius: 8, fontSize: 14, boxShadow: 'none', minHeight: 38, '&:hover': { borderColor: '#1a7a4a' } }),
-  option: (b, s) => ({ ...b, fontSize: 14, background: s.isSelected ? '#1a7a4a' : s.isFocused ? '#e6f4ec' : 'white', color: s.isSelected ? 'white' : '#0d1b12' }),
-  multiValue: (b) => ({ ...b, background: '#d0eddb', borderRadius: 20 }),
-  multiValueLabel: (b) => ({ ...b, color: '#0d2b1f', fontWeight: 600, fontSize: 12 }),
-  multiValueRemove: (b) => ({ ...b, color: '#1a7a4a', ':hover': { background: '#b0d8be' } }),
+const DAY_ABBR = {
+  Monday:'Mo', Tuesday:'Tu', Wednesday:'We',
+  Thursday:'Th', Friday:'Fr', Saturday:'Sa', Sunday:'Su',
 };
 
-// ── A small helper: display value OR input in place ──────────────
-function InlineField({ label, value, editing, inputProps, inputType = 'text', fullWidth = false }) {
-  return (
-    <div className={`field-item${fullWidth ? ' full-col' : ''}`}>
-      <label>{label}</label>
-      {editing
-        ? <input type={inputType} className="form-input" {...inputProps} />
-        : <div className="field-value">{value || '—'}</div>
-      }
-    </div>
-  );
+const selectStyles = {
+  control: (b) => ({ ...b, borderColor:'#e2ebe5', borderRadius:8, fontSize:14, boxShadow:'none', minHeight:38, '&:hover':{ borderColor:'#1a7a4a' } }),
+  option:  (b,s) => ({ ...b, fontSize:14, background:s.isSelected?'#1a7a4a':s.isFocused?'#e6f4ec':'white', color:s.isSelected?'white':'#0d1b12' }),
+  multiValue:       (b) => ({ ...b, background:'#d0eddb', borderRadius:20 }),
+  multiValueLabel:  (b) => ({ ...b, color:'#0d2b1f', fontWeight:600, fontSize:12 }),
+  multiValueRemove: (b) => ({ ...b, color:'#1a7a4a', ':hover':{ background:'#b0d8be' } }),
+};
+
+function cacheUserProfile(updatedUser) {
+  localStorage.setItem('wastelink_user_profile', JSON.stringify(updatedUser));
 }
 
+// ─── Helpers ──────────────────────────────────────────────────
+function formatDays(days) {
+  if (!days?.length) return 'Mon-Fri';
+  const d = [...days].sort();
+  const mf = d.length===5 && ['Monday','Tuesday','Wednesday','Thursday','Friday'].every(x=>d.includes(x));
+  const ms = d.length===6 && mf && d.includes('Saturday');
+  if (ms) return 'Mon-Sat';
+  if (mf) return 'Mon-Fri';
+  return d.join(', ');
+}
+
+// ══════════════════════════════════════════════════════════════
 export default function ProfilePage() {
-  const { user, updateUser } = useAuth();
+  const { user, updateUser, logout } = useAuth();
   const avatarRef = useRef();
 
-  // which section is being edited
-  const [editingSection, setEditingSection] = useState(null); // 'profile' | 'recycler' | null
+  const [editingSection, setEditingSection] = useState(null);
+  const [saving,  setSaving]  = useState(false);
+  const [msg,     setMsg]     = useState('');
+  const [error,   setError]   = useState('');
 
-  const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState('');
-  const [error, setError] = useState('');
+  // Nearby seeded centre prompt (recyclers only)
+  const [nearbySeeded,   setNearbySeeded]   = useState(null);
+  const [pendingPayload, setPendingPayload] = useState(null);
 
-  // ── Forms ────────────────────────────────────────────────────
-  const [form, setForm] = useState({ full_name: '', phone: '' });
-
+  // ── Recycler form ────────────────────────────────────────────
   const [rpForm, setRpForm] = useState({
-    business_name: '',
-    accepted_types: [],
-    max_capacity_kg: '',
-    phone: '',
-    description: '',
-    website: '',
-    operating_days: [],
-    opening_time: '08:00',
-    closing_time: '17:00',
-    location_query: '',
-    lat: null,
-    lng: null,
-    address: '',
-    city: '',
+    business_name:'', accepted_types:[], max_capacity_kg:'',
+    phone:'', description:'', website:'',
+    operating_days:[], opening_time:'08:00', closing_time:'17:00',
+    location_query:'', lat:null, lng:null, address:'', city:'',
+  });
+    const { showToast } = useToast();
+
+  // ── Seller form ──────────────────────────────────────────────
+  const [sellerForm, setSellerForm] = useState({
+    business_name:'', phone:'', description:'',
+    waste_types:[],
+    location_query:'', lat:null, lng:null, address:'', city:'',
   });
 
+  // ── Basic profile form ────────────────────────────────────────
+  const [form, setForm] = useState({ full_name:'', phone:'' });
+
+  const isRecycler = user?.role === 'recycler';
+  const isSeller   = user?.role === 'seller' || user?.role === 'waste_generator' || (!isRecycler);
+
+  // ── Derive sellerLoc reactively from user so it updates after save ──
+  // This fixes the "not saved" display bug — previously a stale snapshot
+  const sellerLoc = useMemo(() => user?.map_locations || {}, [user]);
+  const recycler  = useMemo(() => ({ ...user?.map_locations, ...user?.recycler_profiles }) || {}, [user]);
+  useEffect(() => {
+  console.log('USER:', user);
+  console.log('MAP LOCATIONS:', user?.map_locations);
+  console.log('RECYCLER PROFILES:', user?.recycler_profiles);
+}, [user]);
   // ── Load ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
-    setForm({ full_name: user?.full_name || '', phone: user?.phone || '' });
+    setForm({ full_name: user.full_name||'', phone: user.phone||'' });
 
-    const r = { ...user?.map_locations, ...user?.recycler_profiles } || {};
-    setRpForm({
-      business_name: r?.business_name || '',
-      accepted_types: r?.accepted_types || [],
-      max_capacity_kg: r?.max_capacity_kg || '',
-      phone: r?.phone || user?.phone || '',
-      description: r?.description || '',
-      website: r?.website || '',
-      operating_days: r?.operating_hours?.days
-        ? r.operating_hours.days === 'Mon-Fri'
-          ? ['Monday','Tuesday','Wednesday','Thursday','Friday']
-          : r.operating_hours.days === 'Mon-Sat'
-          ? ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
-          : r.operating_hours.days.split(', ')
-        : [],
-      opening_time: r?.opening_time || r?.operating_hours?.open || '08:00',
-      closing_time: r?.closing_time || r?.operating_hours?.close || '17:00',
-      location_query: r?.address || '',
-      lat: r?.lat || null,
-      lng: r?.lng || null,
-      address: r?.address || '',
-      city: r?.city || '',
-    });
-  }, [user]);
+    if (isRecycler) {
+      const r = { ...user.map_locations, ...user.recycler_profiles } || {};
+      setRpForm({
+        business_name:  r.business_name || '',
+        accepted_types: r.accepted_types || [],
+        max_capacity_kg:r.max_capacity_kg || '',
+        phone:          r.phone || user.phone || '',
+        description:    r.description || '',
+        website:        r.website || '',
+        operating_days: r.operating_hours?.days
+          ? r.operating_hours.days==='Mon-Fri'
+            ? ['Monday','Tuesday','Wednesday','Thursday','Friday']
+            : r.operating_hours.days==='Mon-Sat'
+            ? ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+            : r.operating_hours.days.split(', ')
+          : [],
+        opening_time: r.operating_hours?.open  || '08:00',
+        closing_time: r.operating_hours?.close || '17:00',
+        location_query: r.address || '',
+        lat: r.lat || null, lng: r.lng || null,
+        address: r.address || '', city: r.city || '',
+      });
+    } else {
+      const ml = user.map_locations || {};
+      setSellerForm({
+        business_name:  user.full_name || '',
+        phone:          user.phone || '',
+        description:    ml.description || '',
+        waste_types:    ml.accepted_types || [],
+        location_query: ml.address || '',
+        lat:  ml.lat  || null,
+        lng:  ml.lng  || null,
+        address: ml.address || '',
+        city:    ml.city    || '',
+      });
+    }
+  }, [user, isRecycler]);
 
-  // ── Save profile ─────────────────────────────────────────────
+  // ── Save basic profile ────────────────────────────────────────
   async function saveProfile() {
     setSaving(true); setMsg(''); setError('');
     try {
       const updated = await usersService.updateMe(form);
       updateUser(updated);
-      setMsg('Profile updated successfully.');
+      cacheUserProfile(updated);
+      setMsg('Profile updated.');
       setEditingSection(null);
-    } catch (e) { setError(e.message); }
+    } catch(e) { setError(e.message); }
     finally { setSaving(false); }
   }
 
-  // ── Save recycler ────────────────────────────────────────────
+  // ── Save seller profile → create waste_generator pin ─────────
+  async function saveSellerProfile() {
+    setSaving(true); setMsg(''); setError('');
+    try {
+      
+     if (!sellerForm.business_name) {
+  showToast(
+    'Please enter your name or business name.',
+    'error'
+  );
+
+  return;
+}
+     if (!sellerForm.lat || !sellerForm.lng) {
+  document
+    .querySelector('.location-section')
+    ?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center'
+    });
+
+  showToast(
+    'Please select your location so recyclers can find you.',
+    'error'
+  );
+
+  return;
+}
+      if (!sellerForm.waste_types.length) { setError('Please select at least one type of waste you generate.'); return; }
+
+      await usersService.updateMe({
+        full_name: sellerForm.business_name,
+        phone:     sellerForm.phone,
+      });
+
+      await locationService.saveWasteGeneratorLocation({
+        userId:      user.id,
+        listingId:   null,
+        name:        sellerForm.business_name,
+        lat:         sellerForm.lat,
+        lng:         sellerForm.lng,
+        address:     sellerForm.address,
+        city:        sellerForm.city,
+        description: sellerForm.description,
+        phone:       sellerForm.phone,
+        wasteTypes:  sellerForm.waste_types,
+      });
+
+      // ── FIXED: updateUser now includes all fields so the display
+      //    re-reads them correctly without requiring a page refresh ──
+      const updatedUser = {
+      ...user,
+      full_name: sellerForm.business_name,
+      phone: sellerForm.phone,
+      map_locations: {
+        ...user.map_locations,
+        address: sellerForm.address,
+        city: sellerForm.city,
+        lat: sellerForm.lat,
+        lng: sellerForm.lng,
+        accepted_types: sellerForm.waste_types,
+        description: sellerForm.description,
+        phone: sellerForm.phone,
+      },
+    };
+
+    updateUser(updatedUser);
+    localStorage.setItem('wastelink_user_profile', JSON.stringify(updatedUser));
+
+      showToast(
+        'Profile saved! You are now visible to recyclers on the map.',
+        'success'
+      );
+      setEditingSection(null);
+    } catch(e) { console.error(e); setError(e.message); }
+    finally { setSaving(false); }
+  }
+
+  // ── Save recycler profile ─────────────────────────────────────
   async function saveRecyclerProfile() {
     setSaving(true); setMsg(''); setError('');
     try {
-      if (!rpForm.business_name) { setError('Business name is required.'); return; }
+      if (!rpForm.business_name)             { setError('Business name is required.'); return; }
       if (!rpForm.location_query || !rpForm.lat || !rpForm.lng) {
-        setError('Please select a valid recycling centre location.'); return;
+        
+        showToast(
+          'Please select at least one type of waste you generate.',
+          'error'
+        ); return;
       }
 
-      const formatDays = (days) => {
-        if (!days?.length) return 'Mon-Fri';
-        const d = [...days].sort();
-        const mf = d.length === 5 && ['Monday','Tuesday','Wednesday','Thursday','Friday'].every(x => d.includes(x));
-        const ms = d.length === 6 && mf && d.includes('Saturday');
-        if (ms) return 'Mon-Sat';
-        if (mf) return 'Mon-Fri';
-        return d.join(', ');
+      const operating_hours = {
+        days:  formatDays(rpForm.operating_days),
+        open:  rpForm.opening_time,
+        close: rpForm.closing_time,
       };
 
-      const operating_hours = { days: formatDays(rpForm.operating_days), open: rpForm.opening_time, close: rpForm.closing_time };
-
       await usersService.upsertRecyclerProfile({
-        business_name: rpForm.business_name,
-        accepted_types: rpForm.accepted_types,
+        business_name:   rpForm.business_name,
+        accepted_types:  rpForm.accepted_types,
         max_capacity_kg: rpForm.max_capacity_kg ? parseFloat(rpForm.max_capacity_kg) : null,
-        operating_hours,
-        phone: rpForm.phone,
-        address: rpForm.address,
-        city: rpForm.city,
-        lat: rpForm.lat,
-        lng: rpForm.lng,
-        description: rpForm.description,
-        website: rpForm.website,
+        operating_hours, phone: rpForm.phone,
+        address: rpForm.address, city: rpForm.city,
+        lat: rpForm.lat, lng: rpForm.lng,
+        description: rpForm.description, website: rpForm.website,
       });
 
-      await locationService.saveRecyclerLocation({
+      const locationPayload = {
         name: rpForm.business_name, lat: rpForm.lat, lng: rpForm.lng,
         address: rpForm.address, city: rpForm.city,
-        accepted_types: rpForm.accepted_types, operating_hours,
+        acceptedTypes: rpForm.accepted_types,
+        operatingHours: operating_hours,
         description: rpForm.description, phone: rpForm.phone,
-      });
+      };
 
-      updateUser({ 
-  recycler_profiles: { ...user?.recycler_profiles, ...rpForm, operating_hours },
-  map_locations: { 
-    ...user?.map_locations,
-    address: rpForm.address,
-    city: rpForm.city,
-    lat: rpForm.lat,
-    lng: rpForm.lng,
-    phone: rpForm.phone,
-    description: rpForm.description,
-    name: rpForm.business_name,
-  }
-});
-      setMsg('Recycler profile saved. Your centre will appear on the map.');
-      setEditingSection(null);
-    } catch (e) { console.error(e); setError(e.message); }
+      const nearby = await locationService.findNearbySeededCentre(rpForm.lat, rpForm.lng, 0.2);
+      if (nearby) {
+        setPendingPayload(locationPayload);
+        setNearbySeeded(nearby);
+        return;
+      }
+
+      await locationService.saveRecyclerLocation({ userId: user.id, ...locationPayload });
+      finishRecyclerSave(operating_hours);
+    } catch(e) { console.error(e); setError(e.message); }
     finally { setSaving(false); }
   }
 
-  // ── Avatar ───────────────────────────────────────────────────
+  function finishRecyclerSave(operating_hours) {
+    updateUser({
+      recycler_profiles: { ...user?.recycler_profiles, ...rpForm, operating_hours },
+      map_locations: {
+        ...user?.map_locations,
+        address: rpForm.address, city: rpForm.city,
+        lat: rpForm.lat, lng: rpForm.lng,
+        phone: rpForm.phone, description: rpForm.description,
+        name: rpForm.business_name,
+      },
+    });
+    setMsg('Recycler profile saved. Your centre is visible on the map.');
+    setEditingSection(null);
+    setNearbySeeded(null);
+    setPendingPayload(null);
+  }
+
+  async function handleClaimSeeded(centre) {
+    try {
+      await locationService.claimSeededCentre(centre.id, user.id);
+      finishRecyclerSave({ days: formatDays(rpForm.operating_days), open: rpForm.opening_time, close: rpForm.closing_time });
+    } catch(e) { setError(e.message); setNearbySeeded(null); }
+  }
+
+  async function handleRegisterSeparately() {
+    try {
+      setNearbySeeded(null);
+      await locationService.saveRecyclerLocation({ userId: user.id, ...pendingPayload });
+      finishRecyclerSave(pendingPayload.operatingHours);
+    } catch(e) { setError(e.message); }
+  }
+
   async function uploadAvatar(e) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -217,326 +335,455 @@ export default function ProfilePage() {
       setSaving(true);
       const data = await usersService.uploadAvatar(file);
       updateUser({ avatar_url: data.avatar_url });
-      setMsg('Profile photo updated.');
-    } catch (e) { setError(e.message); }
+      setMsg('Photo updated.');
+    } catch(e) { setError(e.message); }
     finally { setSaving(false); }
   }
 
-  const initials = (user?.full_name || 'WL').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
-  
-const recycler = { ...user?.map_locations, ...user?.recycler_profiles } || {};
-  const isRecycler = user?.role === 'recycler';
+  async function handleLogout() {
+    await logout();
+  }
+
+  const initials = (user?.full_name||'WL').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
 
   const displayDays = rpForm.operating_days.length ? rpForm.operating_days
-    : recycler?.operating_hours?.days === 'Mon-Fri' ? ['Monday','Tuesday','Wednesday','Thursday','Friday']
-    : recycler?.operating_hours?.days === 'Mon-Sat' ? ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
+    : recycler?.operating_hours?.days==='Mon-Fri'  ? ['Monday','Tuesday','Wednesday','Thursday','Friday']
+    : recycler?.operating_hours?.days==='Mon-Sat'  ? ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
     : [];
 
-  const isEditingProfile = editingSection === 'profile';
-  const isEditingRp = editingSection === 'recycler';
+  const isEditingProfile  = editingSection === 'profile';
+  const isEditingRp       = editingSection === 'recycler';
+  const isEditingSeller   = editingSection === 'seller';
 
   function toggleEdit(section) {
-    setEditingSection(prev => prev === section ? null : section);
+    setEditingSection(prev => prev===section ? null : section);
     setMsg(''); setError('');
   }
+
+  const hasSellerLocation = !!(sellerLoc.lat && sellerLoc.lng);
 
   // ─────────────────────────────────────────────────────────────
   return (
     <div className="profile-page">
 
-      {/* Page heading — zero top gap, sits right at the top of the content area */}
+      {nearbySeeded && (
+        <NearbySeededCentrePrompt
+          nearby={nearbySeeded} userId={user.id}
+          onClaimed={handleClaimSeeded}
+          onRegisterAnyway={handleRegisterSeparately}
+          onDismiss={() => { setNearbySeeded(null); setPendingPayload(null); }}
+        />
+      )}
+
+      {/* ── Page header with logout ──────────────────────────── */}
       <div className="profile-page-hd">
-        <div className="page-heading">My Profile</div>
-        <div className="page-subheading">Manage your business details and preferences</div>
+        <div className="profile-page-hd-left">
+          <div className="page-heading">My Profile</div>
+          <div className="page-subheading">
+            {isRecycler ? 'Manage your recycling centre details' : 'Not visible to recyclers yet. Add your location and waste types below'}
+          </div>
+        </div>
+        <button className="logout-btn" onClick={handleLogout} title="Log out">
+          <LogOut size={15} />
+          <span>Log out</span>
+        </button>
       </div>
 
-      {/* Alerts */}
-      {msg   && <div className="alert alert-info">{msg}</div>}
-      {error && <div className="alert alert-warn">{error}</div>}
+      {msg   && <div className="alert alert-info"><Check size={14}/> {msg}</div>}
+      {error && <div className="alert alert-warn"><AlertCircle size={14}/> {error}</div>}
 
-      {/* ── Hero banner ─────────────────────────────────────── */}
+
+      {/* ── Hero ─────────────────────────────────────────────── */}
       <div className="profile-hero-card">
         <div className="profile-hero-inner">
-          {/* Avatar */}
           <div className="avatar-wrap" onClick={() => avatarRef.current?.click()}>
             {user?.avatar_url
-              ? <img src={user.avatar_url} alt="" className="avatar-img" />
+              ? <img src={user.avatar_url} alt="" className="avatar-img"/>
               : <div className="avatar-initials">{initials}</div>
             }
-            <div className="avatar-cam-btn"><Icon name="camera" size={12} /></div>
-            <input ref={avatarRef} type="file" accept="image/*" style={{ display:'none' }} onChange={uploadAvatar} />
+            <div className="avatar-cam-btn"><Camera size={12}/></div>
+            <input ref={avatarRef} type="file" accept="image/*" style={{display:'none'}} onChange={uploadAvatar}/>
           </div>
-
-          {/* Name block */}
           <div className="hero-text">
-            <div className="hero-biz-name">{recycler?.business_name || user?.full_name || '—'}</div>
-            <div className="hero-user-name">{user?.full_name}</div>
+            <div className="hero-biz-name">
+              {isRecycler ? (recycler?.business_name || user?.full_name || '—') : (user?.full_name || '—')}
+            </div>
+            <div className="hero-user-name">{user?.email}</div>
             <div className="hero-meta">
-              <span className="badge-active">Active</span>
+              <span className={`badge-role ${isRecycler ? 'recycler' : 'seller'}`}>
+                {isRecycler ? <><Recycle size={11}/> Recycler</> : <><Package size={11}/> Waste Seller</>}
+              </span>
               <span className="hero-joined">
                 Joined {user?.created_at
-                  ? new Date(user.created_at).toLocaleDateString('en-US', { month:'long', year:'numeric' })
-                  : 'January 2024'}
+                  ? new Date(user.created_at).toLocaleDateString('en-US',{month:'long',year:'numeric'})
+                  : 'recently'}
               </span>
             </div>
           </div>
-
-          {/* Edit button — top right */}
           <button
-            className={`btn-edit-profile${isEditingProfile || isEditingRp ? ' active' : ''}`}
-            onClick={() => toggleEdit(isRecycler ? 'recycler' : 'profile')}
+            className={`btn-edit-profile${(isEditingProfile||isEditingRp||isEditingSeller)?' active':''}`}
+            onClick={() => toggleEdit(isRecycler ? 'recycler' : 'seller')}
           >
-            {isEditingProfile || isEditingRp
-              ? <><Icon name="x" size={13} /> Cancel</>
-              : <><Icon name="edit" size={13} /> Edit Profile</>
+            {(isEditingProfile||isEditingRp||isEditingSeller)
+              ? <><X size={13}/> Cancel</>
+              : <><Edit2 size={13}/> Edit Profile</>
             }
           </button>
         </div>
       </div>
 
-      {/* ── Main two-column body ─────────────────────────────── */}
       <div className="profile-body">
-
-        {/* ── LEFT ── */}
         <div className="profile-left">
 
-          {/* BUSINESS DETAILS */}
-          <div className="section-card">
-            <div className="section-card-hd">
-              <span className="section-card-title">Business Details</span>
-              <div className="section-icon-btn"><Icon name="building" size={15} /></div>
-            </div>
-
-            <div className="field-grid">
-              {/* Business Name */}
-              <div className="field-item">
-                <label>Business Name</label>
-                {isEditingRp
-                  ? <input className="form-input" value={rpForm.business_name} onChange={e => setRpForm({...rpForm, business_name: e.target.value})} />
-                  : <div className="field-value">{recycler?.business_name || '—'}</div>}
-              </div>
-
-              {/* Contact Person — never editable, it's the user's name */}
-              <div className="field-item">
-                <label>Contact Person</label>
-                <div className="field-value">{user?.full_name || '—'}</div>
-              </div>
-
-              {/* Email — never editable */}
-              <div className="field-item">
-                <label>Email Address</label>
-                <div className="field-value">{user?.email || '—'}</div>
-              </div>
-
-              {/* Phone */}
-              <div className="field-item">
-                <label>Phone Number</label>
-                {isEditingRp
-                  ? <input className="form-input" value={rpForm.phone} onChange={e => setRpForm({...rpForm, phone: e.target.value})} />
-                  : isEditingProfile
-                  ? <input className="form-input" value={form.phone} onChange={e => setForm({...form, phone: e.target.value})} />
-                  : <div className="field-value">{recycler?.phone || user?.phone || '—'}</div>}
-              </div>
-
-              {/* Website */}
-              <div className="field-item full-col">
-                <label>Website <span style={{fontWeight:400,textTransform:'none'}}>(optional)</span></label>
-                {isEditingRp
-                  ? <input className="form-input" placeholder="https://" value={rpForm.website} onChange={e => setRpForm({...rpForm, website: e.target.value})} />
-                  : <div className="field-value">{recycler?.website ? <a href={recycler.website} target="_blank" rel="noreferrer">{recycler.website}</a> : '—'}</div>}
-              </div>
-            </div>
-
-            {/* Name edit (non-recycler profile) */}
-            {isEditingProfile && !isRecycler && (
-              <div className="field-grid" style={{marginTop: 12}}>
-                <div className="field-item">
-                  <label>Full Name</label>
-                  <input className="form-input" value={form.full_name} onChange={e => setForm({...form, full_name: e.target.value})} />
+          {/* ══ SELLER PROFILE SECTION ══════════════════════════ */}
+          {isSeller && (
+            <>
+              {/* Basic info */}
+              <div className="section-card">
+                <div className="section-card-hd">
+                  <span className="section-card-title">Your Details</span>
+                  <div className="section-icon-btn"><User size={15}/></div>
                 </div>
-              </div>
-            )}
-
-            {/* Bio */}
-            <div className="field-bio">
-              <label>Business Bio</label>
-              {isEditingRp
-                ? <textarea className="form-input" rows={4} placeholder="Tell users about your recycling centre…"
-                    value={rpForm.description} onChange={e => setRpForm({...rpForm, description: e.target.value})} />
-                : <p>{recycler?.description || <span style={{color:'#9aab9e'}}>No description added yet.</span>}</p>}
-            </div>
-
-            {/* Accepted waste types (editable) */}
-            {isEditingRp && (
-              <div className="form-group" style={{marginTop: 16}}>
-                <label className="form-label">Accepted Waste Types</label>
-                <Select isMulti options={wasteOptions} styles={selectStyles}
-                  value={wasteOptions.filter(o => rpForm.accepted_types.includes(o.value))}
-                  onChange={vals => setRpForm({...rpForm, accepted_types: vals.map(v => v.value)})} />
-              </div>
-            )}
-
-            {/* Max capacity (editable) */}
-            {isEditingRp && (
-              <div className="form-group" style={{marginTop: 12}}>
-                <label className="form-label">Max Capacity (kg)</label>
-                <input type="number" className="form-input" value={rpForm.max_capacity_kg}
-                  onChange={e => setRpForm({...rpForm, max_capacity_kg: e.target.value})} />
-              </div>
-            )}
-
-            {/* Save row */}
-            {(isEditingProfile || isEditingRp) && (
-              <div className="btn-row">
-                <button className="btn btn-ghost" onClick={() => setEditingSection(null)}>Cancel</button>
-                <button className="btn btn-primary" disabled={saving}
-                  onClick={isEditingRp ? saveRecyclerProfile : saveProfile}>
-                  {saving ? <><span className="spinner" /> Saving…</> : <><Icon name="check" size={14} /> Save Changes</>}
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* RECYCLING LOCATION */}
-          {isRecycler && (
-            <div className="section-card">
-              <div className="section-card-hd">
-                <span className="section-card-title">Recycling Location</span>
-                <div className="section-icon-btn"><Icon name="pin" size={15} /></div>
-              </div>
-              <div className="field-grid">
-                <div className="field-item">
-                  <label>Street Address</label>
-                  {isEditingRp
-                    ? <LocationAutocomplete value={rpForm.location_query}
-                        onSelect={(location, text) => {
-                          if (!location) { setRpForm({...rpForm, location_query: text}); return; }
-                          setRpForm({...rpForm, location_query: text, lat: location.lat, lng: location.lng, address: location.address, city: location.city});
-                        }} />
-                    : <div className="field-value">{recycler?.address || '—'}</div>}
-                </div>
-                <div className="field-item">
-                  <label>City / Town</label>
-                  {isEditingRp
-                    ? <input className="form-input" value={rpForm.city} onChange={e => setRpForm({...rpForm, city: e.target.value})} />
-                    : <div className="field-value">{recycler?.city || '—'}</div>}
-                </div>
-              </div>
-              {(recycler?.lat || rpForm.lat) && (
-                <div className="coords-row">
-                  <div className="coords-icon"><Icon name="map" size={16} /></div>
-                  <div className="coords-text">
-                    <small>Coordinates</small>
-                    <span>{Number(recycler?.lat || rpForm.lat).toFixed(4)}, {Number(recycler?.lng || rpForm.lng).toFixed(4)}</span>
+                <div className="field-grid">
+                  <div className="field-item">
+                    <label>Name / Business Name</label>
+                    {isEditingSeller
+                      ? <input className="form-input" value={sellerForm.business_name} onChange={e=>setSellerForm({...sellerForm,business_name:e.target.value})} placeholder="e.g. Hannah Wanjiku or ABC Hotel"/>
+                      : <div className="field-value">{user?.full_name || '—'}</div>}
                   </div>
-                  {!isEditingRp && (
-                    <button className="btn-update-map" onClick={() => toggleEdit('recycler')}>Update on Map</button>
-                  )}
+                  <div className="field-item">
+                    <label>Email</label>
+                    <div className="field-value">{user?.email || '—'}</div>
+                  </div>
+                  <div className="field-item">
+                    <label>Phone Number</label>
+                    {isEditingSeller
+                      ? <input className="form-input" value={sellerForm.phone} onChange={e=>setSellerForm({...sellerForm,phone:e.target.value})} placeholder="+254 7XX XXX XXX"/>
+                      : <div className="field-value">{user?.phone || '—'}</div>}
+                  </div>
+                  <div className="field-item full-col">
+                    <label>About You / Your Business</label>
+                    {isEditingSeller
+                      ? <textarea className="form-input" rows={3} value={sellerForm.description} onChange={e=>setSellerForm({...sellerForm,description:e.target.value})} placeholder="e.g. Small hotel producing glass bottles, cardboard and plastic waste weekly."/>
+                      : <div className="field-value">{sellerLoc.description || <span style={{color:'#9aab9e'}}>No description yet.</span>}</div>}
+                  </div>
+                </div>
+              </div>
+
+              {/* Location */}
+              <div className="section-card">
+                <div className="section-card-hd">
+                  <span className="section-card-title">Your Location</span>
+                  <div className="section-icon-btn"><MapPin size={15}/></div>
+                </div>
+                <p className="section-hint">
+                  <MapPin size={12}/> This is where recyclers will come to collect your waste. Be as specific as possible.
+                </p>
+                <div className="field-grid">
+                  <div className="field-item">
+                    <label>Street Address</label>
+                    {isEditingSeller
+                      ? <LocationAutocomplete value={sellerForm.location_query}
+                          onSelect={(loc, text) => {
+                            if (!loc) { setSellerForm({...sellerForm, location_query:text}); return; }
+                            setSellerForm({...sellerForm, location_query:text, lat:loc.lat, lng:loc.lng, address:loc.address, city:loc.city});
+                          }}/>
+                      : <div className="field-value">{sellerLoc.address || '—'}</div>}
+                  </div>
+                  <div className="field-item">
+                    <label>City / Town</label>
+                    {isEditingSeller
+                      ? <input className="form-input" value={sellerForm.city} onChange={e=>setSellerForm({...sellerForm,city:e.target.value})} placeholder="e.g. Nairobi"/>
+                      : <div className="field-value">{sellerLoc.city || '—'}</div>}
+                  </div>
+                </div>
+                {(sellerLoc.lat || sellerForm.lat) && (
+                  <div className="coords-row">
+                    <div className="coords-icon"><MapPin size={16}/></div>
+                    <div className="coords-text">
+                      <small>Coordinates saved</small>
+                      <span>{Number(sellerLoc.lat||sellerForm.lat).toFixed(4)}, {Number(sellerLoc.lng||sellerForm.lng).toFixed(4)}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Waste types */}
+              <div className="section-card">
+                <div className="section-card-hd">
+                  <span className="section-card-title">Waste I Generate</span>
+                  <div className="section-icon-btn"><Recycle size={15}/></div>
+                </div>
+                <p className="section-hint">
+                  <Package size={12}/> Recyclers use this to decide if they can collect from you.
+                </p>
+                {isEditingSeller
+                  ? <Select isMulti options={wasteOptions} styles={selectStyles}
+                      value={wasteOptions.filter(o=>sellerForm.waste_types.includes(o.value))}
+                      onChange={vals=>setSellerForm({...sellerForm,waste_types:vals.map(v=>v.value)})}
+                      placeholder="Select all waste types you produce…"/>
+                  : (
+                    <div className="recycle-tags">
+                      {(sellerLoc.accepted_types||[]).length>0
+                        ? (sellerLoc.accepted_types||[]).map(t=>(
+                            <div className="recycle-tag" key={t}><Recycle size={12}/>{t}</div>
+                          ))
+                        : <span style={{fontSize:13,color:'#9aab9e'}}>No waste types added yet.</span>
+                      }
+                    </div>
+                  )
+                }
+              </div>
+
+              {/* Save button */}
+              {isEditingSeller && (
+                <div className="section-card">
+                  <div className="btn-row">
+                    <button className="btn btn-ghost" onClick={()=>setEditingSection(null)}>Cancel</button>
+                    <button className="btn btn-primary" disabled={saving} onClick={saveSellerProfile}>
+                      {saving ? <><span className="spinner"/> Saving…</> : <><Check size={14}/> Save & Go Live on Map</>}
+                    </button>
+                  </div>
                 </div>
               )}
-            </div>
+            </>
           )}
 
-          {/* WORKING HOURS */}
+          {/* ══ RECYCLER PROFILE SECTION ════════════════════════ */}
           {isRecycler && (
-            <div className="section-card">
-              <div className="section-card-hd">
-                <span className="section-card-title">Working Hours</span>
-                <div className="section-icon-btn"><Icon name="clock" size={15} /></div>
+            <>
+              <div className="section-card">
+                <div className="section-card-hd">
+                  <span className="section-card-title">Business Details</span>
+                  <div className="section-icon-btn"><Building2 size={15}/></div>
+                </div>
+                <div className="field-grid">
+                  <div className="field-item">
+                    <label>Business Name</label>
+                    {isEditingRp
+                      ? <input className="form-input" value={rpForm.business_name} onChange={e=>setRpForm({...rpForm,business_name:e.target.value})}/>
+                      : <div className="field-value">{recycler?.business_name||'—'}</div>}
+                  </div>
+                  <div className="field-item">
+                    <label>Contact Person</label>
+                    <div className="field-value">{user?.full_name||'—'}</div>
+                  </div>
+                  <div className="field-item">
+                    <label>Email</label>
+                    <div className="field-value">{user?.email||'—'}</div>
+                  </div>
+                  <div className="field-item">
+                    <label>Phone</label>
+                    {isEditingRp
+                      ? <input className="form-input" value={rpForm.phone} onChange={e=>setRpForm({...rpForm,phone:e.target.value})}/>
+                      : <div className="field-value">{recycler?.phone||user?.phone||'—'}</div>}
+                  </div>
+                  <div className="field-item full-col">
+                    <label>Website <span style={{fontWeight:400,textTransform:'none'}}>(optional)</span></label>
+                    {isEditingRp
+                      ? <input className="form-input" placeholder="https://" value={rpForm.website} onChange={e=>setRpForm({...rpForm,website:e.target.value})}/>
+                      : <div className="field-value">{recycler?.website?<a href={recycler.website} target="_blank" rel="noreferrer">{recycler.website}</a>:'—'}</div>}
+                  </div>
+                </div>
+                <div className="field-bio">
+                  <label>About Your Centre</label>
+                  {isEditingRp
+                    ? <textarea className="form-input" rows={4} placeholder="Tell sellers about your recycling centre…" value={rpForm.description} onChange={e=>setRpForm({...rpForm,description:e.target.value})}/>
+                    : <p>{recycler?.description||<span style={{color:'#9aab9e'}}>No description yet.</span>}</p>}
+                </div>
+                {isEditingRp && (
+                  <>
+                    <div className="form-group" style={{marginTop:16}}>
+                      <label className="form-label">Accepted Waste Types</label>
+                      <Select isMulti options={wasteOptions} styles={selectStyles}
+                        value={wasteOptions.filter(o=>rpForm.accepted_types.includes(o.value))}
+                        onChange={vals=>setRpForm({...rpForm,accepted_types:vals.map(v=>v.value)})}/>
+                    </div>
+                    <div className="form-group" style={{marginTop:12}}>
+                      <label className="form-label">Max Capacity (kg)</label>
+                      <input type="number" className="form-input" value={rpForm.max_capacity_kg} onChange={e=>setRpForm({...rpForm,max_capacity_kg:e.target.value})}/>
+                    </div>
+                  </>
+                )}
+                {isEditingRp && (
+                  <div className="btn-row">
+                    <button className="btn btn-ghost" onClick={()=>setEditingSection(null)}>Cancel</button>
+                    <button className="btn btn-primary" disabled={saving} onClick={saveRecyclerProfile}>
+                      {saving?<><span className="spinner"/> Saving…</>:<><Check size={14}/> Save Changes</>}
+                    </button>
+                  </div>
+                )}
               </div>
 
-              {isEditingRp ? (
-                <>
-                  <div className="day-presets">
-                    <button type="button" className="day-preset-btn"
-                      onClick={() => setRpForm({...rpForm, operating_days:['Monday','Tuesday','Wednesday','Thursday','Friday']})}>Mon–Fri</button>
-                    <button type="button" className="day-preset-btn"
-                      onClick={() => setRpForm({...rpForm, operating_days:['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']})}>Mon–Sat</button>
+              {/* Recycler Location */}
+              <div className="section-card">
+                <div className="section-card-hd">
+                  <span className="section-card-title">Centre Location</span>
+                  <div className="section-icon-btn"><MapPin size={15}/></div>
+                </div>
+                <div className="field-grid">
+                  <div className="field-item">
+                    <label>Street Address</label>
+                    {isEditingRp
+                      ? <LocationAutocomplete value={rpForm.location_query}
+                          onSelect={(loc,text)=>{
+                            if(!loc){setRpForm({...rpForm,location_query:text});return;}
+                            setRpForm({...rpForm,location_query:text,lat:loc.lat,lng:loc.lng,address:loc.address,city:loc.city});
+                          }}/>
+                      : <div className="field-value">{recycler?.address||'—'}</div>}
                   </div>
-                  <Select isMulti options={dayOptions} styles={selectStyles} placeholder="Select working days…"
-                    value={dayOptions.filter(o => rpForm.operating_days.includes(o.value))}
-                    onChange={vals => setRpForm({...rpForm, operating_days: vals.map(v => v.value)})} />
-                  <div className="field-grid" style={{marginTop:14}}>
-                    <div className="field-item">
-                      <label>Opening Time</label>
-                      <input type="time" className="form-input" value={rpForm.opening_time}
-                        onChange={e => setRpForm({...rpForm, opening_time: e.target.value})} />
-                    </div>
-                    <div className="field-item">
-                      <label>Closing Time</label>
-                      <input type="time" className="form-input" value={rpForm.closing_time}
-                        onChange={e => setRpForm({...rpForm, closing_time: e.target.value})} />
-                    </div>
+                  <div className="field-item">
+                    <label>City / Town</label>
+                    {isEditingRp
+                      ? <input className="form-input" value={rpForm.city} onChange={e=>setRpForm({...rpForm,city:e.target.value})}/>
+                      : <div className="field-value">{recycler?.city||'—'}</div>}
                   </div>
-                </>
-              ) : (
-                <div className="hours-list">
-                  {displayDays.length > 0 ? displayDays.map(day => (
-                    <div className="hours-row" key={day}>
-                      <div className="day-abbr">{DAY_ABBR[day]}</div>
-                      <div className="day-name">{day}</div>
-                      <div className="hours-time">
-                        {recycler?.operating_hours?.open || rpForm.opening_time || '08:00'} – {recycler?.operating_hours?.close || rpForm.closing_time || '17:00'}
+                </div>
+                {(recycler?.lat||rpForm.lat)&&(
+                  <div className="coords-row">
+                    <div className="coords-icon"><MapPin size={16}/></div>
+                    <div className="coords-text">
+                      <small>Coordinates</small>
+                      <span>{Number(recycler?.lat||rpForm.lat).toFixed(4)}, {Number(recycler?.lng||rpForm.lng).toFixed(4)}</span>
+                    </div>
+                    {!isEditingRp&&<button className="btn-update-map" onClick={()=>toggleEdit('recycler')}>Update</button>}
+                  </div>
+                )}
+              </div>
+
+              {/* Working Hours */}
+              <div className="section-card">
+                <div className="section-card-hd">
+                  <span className="section-card-title">Working Hours</span>
+                  <div className="section-icon-btn"><Clock size={15}/></div>
+                </div>
+                {isEditingRp?(
+                  <>
+                    <div className="day-presets">
+                      <button type="button" className="day-preset-btn" onClick={()=>setRpForm({...rpForm,operating_days:['Monday','Tuesday','Wednesday','Thursday','Friday']})}>Mon–Fri</button>
+                      <button type="button" className="day-preset-btn" onClick={()=>setRpForm({...rpForm,operating_days:['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']})}>Mon–Sat</button>
+                    </div>
+                    <Select isMulti options={dayOptions} styles={selectStyles} placeholder="Select working days…"
+                      value={dayOptions.filter(o=>rpForm.operating_days.includes(o.value))}
+                      onChange={vals=>setRpForm({...rpForm,operating_days:vals.map(v=>v.value)})}/>
+                    <div className="field-grid" style={{marginTop:14}}>
+                      <div className="field-item">
+                        <label>Opening Time</label>
+                        <input type="time" className="form-input" value={rpForm.opening_time} onChange={e=>setRpForm({...rpForm,opening_time:e.target.value})}/>
                       </div>
-                      <div className="dot-open" />
+                      <div className="field-item">
+                        <label>Closing Time</label>
+                        <input type="time" className="form-input" value={rpForm.closing_time} onChange={e=>setRpForm({...rpForm,closing_time:e.target.value})}/>
+                      </div>
                     </div>
-                  )) : <p style={{color:'#9aab9e', fontSize:14, margin:0}}>No working hours set yet.</p>}
-                </div>
-              )}
-            </div>
+                  </>
+                ):(
+                  <div className="hours-list">
+                    {displayDays.length>0?displayDays.map(day=>(
+                      <div className="hours-row" key={day}>
+                        <div className="day-abbr">{DAY_ABBR[day]}</div>
+                        <div className="day-name">{day}</div>
+                        <div className="hours-time">{recycler?.operating_hours?.open||rpForm.opening_time||'08:00'} – {recycler?.operating_hours?.close||rpForm.closing_time||'17:00'}</div>
+                        <div className="dot-open"/>
+                      </div>
+                    )):<p style={{color:'#9aab9e',fontSize:14,margin:0}}>No hours set yet.</p>}
+                  </div>
+                )}
+              </div>
+            </>
           )}
+        </div>
 
-        </div>{/* end LEFT */}
-
-        {/* ── RIGHT ── */}
+        {/* ── RIGHT COLUMN ─────────────────────────────────────── */}
         <div className="profile-right">
 
-          {/* WHAT WE RECYCLE */}
+          {/* Seller quick stats */}
+          {isSeller && (
+            <div className="section-card">
+              <div className="section-card-hd">
+                <span className="section-card-title">Waste I Generate</span>
+                <div className="section-icon-btn"><Package size={15}/></div>
+              </div>
+              <div className="recycle-tags">
+                {(sellerLoc.accepted_types||[]).length>0
+                  ?(sellerLoc.accepted_types||[]).map(t=>(<div className="recycle-tag" key={t}><Recycle size={12}/>{t}</div>))
+                  :<span style={{fontSize:13,color:'#9aab9e'}}>No waste types added yet.</span>}
+              </div>
+            </div>
+          )}
+
+          {/* Seller map visibility status */}
+          {isSeller && (
+            <div className="section-card">
+              <div className="section-card-hd">
+                <span className="section-card-title">Map Visibility</span>
+                <div className="section-icon-btn"><MapPin size={15}/></div>
+              </div>
+              <ul className="quick-stats">
+                <li className="quick-stat">
+                  <div className={`quick-stat-icon ${hasSellerLocation?'green':''}`}><MapPin size={14}/></div>
+                  <span className="quick-stat-label">Location</span>
+                  <span className="quick-stat-value">{sellerLoc.city||'Not set'}</span>
+                </li>
+                <li className="quick-stat">
+                  <div className={`quick-stat-icon ${(sellerLoc.accepted_types||[]).length>0?'green':''}`}><Recycle size={14}/></div>
+                  <span className="quick-stat-label">Waste Types</span>
+                  <span className="quick-stat-value">{(sellerLoc.accepted_types||[]).length} selected</span>
+                </li>
+                <li className="quick-stat">
+                  <div className={`quick-stat-icon ${hasSellerLocation?'green':'amber'}`}>
+                    {hasSellerLocation?<Check size={14}/>:<AlertCircle size={14}/>}
+                  </div>
+                  <span className="quick-stat-label">Visible to recyclers</span>
+                  <span className="quick-stat-value" style={{color:hasSellerLocation?'#1a4731':'#e07b2a'}}>
+                    {hasSellerLocation?'Yes ✓':'Not yet'}
+                  </span>
+                </li>
+              </ul>
+            </div>
+          )}
+
+          {/* Recycler waste types */}
           {isRecycler && (
             <div className="section-card">
               <div className="section-card-hd">
                 <span className="section-card-title">What We Recycle</span>
-                <div className="section-icon-btn"><Icon name="recycle" size={15} /></div>
+                <div className="section-icon-btn"><Recycle size={15}/></div>
               </div>
               <div className="recycle-tags">
-                {(recycler?.accepted_types || rpForm.accepted_types || []).map(t => (
-                  <div className="recycle-tag" key={t}>
-                    <Icon name={wasteIconName(t)} size={13} />
-                    {t}
-                  </div>
+                {(recycler?.accepted_types||rpForm.accepted_types||[]).map(t=>(
+                  <div className="recycle-tag" key={t}><Recycle size={12}/>{t}</div>
                 ))}
-                {!(recycler?.accepted_types || rpForm.accepted_types || []).length && (
-                  <span style={{fontSize:13, color:'#9aab9e'}}>No waste types added yet.</span>
+                {!(recycler?.accepted_types||rpForm.accepted_types||[]).length&&(
+                  <span style={{fontSize:13,color:'#9aab9e'}}>No waste types added yet.</span>
                 )}
               </div>
             </div>
           )}
 
-          {/* QUICK STATS */}
+          {/* Recycler quick stats */}
           {isRecycler && (
             <div className="section-card">
-              <div className="section-card-hd">
-                <span className="section-card-title">Quick Stats</span>
-              </div>
+              <div className="section-card-hd"><span className="section-card-title">Quick Stats</span></div>
               <ul className="quick-stats">
                 <li className="quick-stat">
-                  <div className="quick-stat-icon"><Icon name="recycle" size={14} /></div>
+                  <div className="quick-stat-icon"><Recycle size={14}/></div>
                   <span className="quick-stat-label">Waste Types</span>
-                  <span className="quick-stat-value">{(recycler?.accepted_types || rpForm.accepted_types || []).length}</span>
+                  <span className="quick-stat-value">{(recycler?.accepted_types||rpForm.accepted_types||[]).length}</span>
                 </li>
                 <li className="quick-stat">
-                  <div className="quick-stat-icon"><Icon name="pin" size={14} /></div>
+                  <div className="quick-stat-icon"><MapPin size={14}/></div>
                   <span className="quick-stat-label">Location</span>
-                  <span className="quick-stat-value">{recycler?.city || rpForm.city || '—'}</span>
+                  <span className="quick-stat-value">{recycler?.city||rpForm.city||'—'}</span>
                 </li>
                 <li className="quick-stat">
-                  <div className="quick-stat-icon"><Icon name="calendar" size={14} /></div>
+                  <div className="quick-stat-icon"><Calendar size={14}/></div>
                   <span className="quick-stat-label">Days Open</span>
                   <span className="quick-stat-value">{displayDays.length} / 7</span>
                 </li>
-                {recycler?.rating && (
+                {recycler?.rating&&(
                   <li className="quick-stat">
-                    <div className="quick-stat-icon" style={{color:'#e6a817', background:'#fef9e7'}}><Icon name="star" size={14} /></div>
+                    <div className="quick-stat-icon" style={{color:'#e6a817',background:'#fef9e7'}}><Star size={14}/></div>
                     <span className="quick-stat-label">Rating</span>
                     <span className="quick-stat-value" style={{color:'#e6a817'}}>{recycler.rating} / 5.0</span>
                   </li>
@@ -545,28 +792,16 @@ const recycler = { ...user?.map_locations, ...user?.recycler_profiles } || {};
             </div>
           )}
 
-          {/* ACCOUNT */}
+          {/* Account */}
           <div className="section-card">
-            <div className="section-card-hd">
-              <span className="section-card-title">Account</span>
-            </div>
+            <div className="section-card-hd"><span className="section-card-title">Account</span></div>
             <ul className="account-list">
-              <li className="account-item">
-                <span className="account-item-icon"><Icon name="lock" size={15} /></span>
-                Change Password
-              </li>
-              <li className="account-item">
-                <span className="account-item-icon"><Icon name="bell" size={15} /></span>
-                Notification Settings
-              </li>
-              <li className="account-item danger">
-                <span className="account-item-icon"><Icon name="trash" size={15} /></span>
-                Delete Account
-              </li>
+              <li className="account-item"><span className="account-item-icon"><Lock size={15}/></span>Change Password</li>
+              <li className="account-item"><span className="account-item-icon"><Bell size={15}/></span>Notification Settings</li>
+              <li className="account-item danger"><span className="account-item-icon"><Trash2 size={15}/></span>Delete Account</li>
             </ul>
           </div>
-
-        </div>{/* end RIGHT */}
+        </div>
       </div>
     </div>
   );

@@ -46,14 +46,25 @@ export function AuthProvider({ children }) {
 }, []);
 
   const logout = useCallback(async () => {
+  try {
     await authService.logout();
+  } catch (e) {
+    console.warn('logout failed');
+  } finally {
     setUser(null);
-  }, []);
+    localStorage.removeItem('wastelink_user_profile');
+  }
+}, []);
 
   const updateUser = useCallback((updates) => {
     setUser(prev => prev ? { ...prev, ...updates } : prev);
   }, []);
 
+  const cached = localStorage.getItem('wastelink_user_profile');
+
+    if (cached && !user?.map_locations) {
+      setUser(JSON.parse(cached));
+    }
   return (
     <AuthContext.Provider value={{ user, loading, error, setError, login, register, logout, updateUser }}>
       {children}
