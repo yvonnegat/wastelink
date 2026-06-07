@@ -144,15 +144,6 @@ const recyclerSteps = [
   },
 ];
 
-const imgColors = [
-  "linear-gradient(135deg, #d4edda 0%, #a8d5b5 100%)",
-  "linear-gradient(135deg, #c8e6c9 0%, #81c784 100%)",
-  "linear-gradient(135deg, #b2dfdb 0%, #4db6ac 100%)",
-  "linear-gradient(135deg, #dcedc8 0%, #aed581 100%)",
-  "linear-gradient(135deg, #c5e1a5 0%, #7cb342 100%)",
-  "linear-gradient(135deg, #a5d6a7 0%, #388e3c 100%)",
-];
-
 function StepCard({ step, index, isMobile }) {
   const isLeft = step.imageLeft;
 
