@@ -3,9 +3,12 @@ import { WASTE_TYPES } from '../../data/mockData';
 import { Button, StepIndicator, Alert } from '../common';
 import Icon from '../common/Icon';
 import { listingsService } from '../../services/ListingService';
+import { useVision } from '../../hooks/useVision';
 import { getPrice } from '../../services/pricingService';
 
-const STEPS = ['Details', 'Price', 'Upload', 'Done'];
+
+
+const STEPS = ['Details', 'Price', 'Verify', 'Done'];
 
 const CONDITIONS = [
   { label: 'Clean / Sorted', value: 'clean' },
@@ -79,7 +82,6 @@ export default function WasteListing({ onNavigate }) {
   const [condition, setCondition] = useState('clean');
   const [collectionPoint, setCollectionPoint] = useState('commercial');
   const [county, setCounty] = useState('Nairobi');
-  const [distanceKm, setDistanceKm] = useState(5);
   const [notes, setNotes] = useState('');
   
   // Location state
@@ -101,6 +103,13 @@ export default function WasteListing({ onNavigate }) {
   const [previews, setPreviews] = useState([]);
   const [drag, setDrag] = useState(false);
   const [loading, setLoading] = useState(false);
+  const {
+  result: visionResult,
+  loading: visionLoading,
+  error: visionError,
+  analyse,
+  clear: clearVision,
+} = useVision();
   const [error, setError] = useState('');
   const fileRef = useRef();
 
@@ -177,6 +186,7 @@ export default function WasteListing({ onNavigate }) {
     
     const timeout = setTimeout(fetchAiPrice, 500);
     return () => clearTimeout(timeout);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wasteType, subtype, qty, condition, county, collectionPoint]);
 
   function handleFile(newFiles) {
@@ -288,39 +298,96 @@ async function handleCreateListing() {
 
   // STEP 3: Upload images
   async function handleUploadImages() {
-    if (!createdListing) {
-      setError('Listing not found. Please go back and recreate.');
-      return;
-    }
-    
-    setError('');
-    setLoading(true);
-    try {
-      if (files.length > 0) {
-        console.log('📸 Uploading images...', files.length);
-        await listingsService.uploadImages(createdListing.id, files);
-        console.log('✅ Images uploaded');
-      }
-      
-      if (files.length === 0) {
-        console.log('📤 No images, submitting listing...');
-        await listingsService.submit(createdListing.id);
-      }
-      
-      setStep(4);
-    } catch (e) {
-      console.error('❌ Upload failed:', e);
-      setError(e.message || 'Upload failed. Your listing was saved — you can skip images.');
-      setStep(4);
-    } finally {
-      setLoading(false);
-    }
+  if (!createdListing) {
+    setError('Listing not found. Please go back and recreate.');
+    return;
   }
+
+  if (files.length === 0) {
+    setError('Please upload at least one image for CV verification.');
+    return;
+  }
+
+  const categoryMap = {
+    Plastic:   'Plastic',
+    Paper:     'Paper',
+    Metal:     'Metal',
+    Glass:     'Glass',
+    Organic:   'Other',
+    'E-Waste': 'Other',
+    Textile:   'Other',
+    Rubber:    'Other',
+  };
+  const declaredCategory    = categoryMap[wasteType] || 'Other';
+  const declaredSubcategory = subtype || null;
+
+  await analyse(files, declaredCategory, declaredSubcategory);
+}
+
+async function handleConfirmSubmit() {
+  if (!createdListing) return;
+  if (!visionResult) return;
+
+  setError('');
+  setLoading(true);
+  try {
+    // Step 1: Save CV vision results to the listing
+    await listingsService.update(createdListing.id, {
+      vision_confidence:  visionResult.confidence,
+      vision_quality:     visionResult.qualityScore,
+      vision_consistency: visionResult.consistencyScore,
+      vision_verdict:     visionResult.verdict,
+      vision_notes:       visionResult.notes,
+    });
+
+    // Step 2: Upload images
+    if (files.length > 0) {
+      await listingsService.uploadImages(createdListing.id, files);
+    }
+
+    // Step 3: Submit
+    try {
+      await listingsService.submit(createdListing.id);
+    } catch (submitErr) {
+      // Check if listing actually submitted despite the error
+      // by fetching the current status from the backend
+      const freshListing = await listingsService.getById(createdListing.id);
+      console.log('Listing status after submit attempt:', freshListing.status);
+
+      // If it reached pending_verification or similar — it succeeded
+      const successStatuses = [
+        'pending_verification',
+        'pending',
+        'submitted',
+        'under_review',
+        'active',
+      ];
+      if (successStatuses.includes(freshListing.status)) {
+        // Submission succeeded despite the error response
+        console.log('✅ Listing submitted successfully:', freshListing.status);
+        clearVision();
+        setStep(4);
+        return;
+      }
+
+      // Genuinely failed — show the error
+      throw submitErr;
+    }
+
+    clearVision();
+    setStep(4);
+  } catch (e) {
+    console.error('❌ Submit failed:', e);
+    setError(e.message || 'Submission failed. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+}
 
   function reset() {
     setStep(1); setWasteType(''); setSubtype(''); setQty('');
     setCondition('clean'); setCollectionPoint('commercial'); setCounty('Nairobi');
-    setDistanceKm(5); setNotes(''); setSelectedPricePerKg(null); 
+    ; setNotes(''); setSelectedPricePerKg(null); 
     setManualPricePerKg(''); setPriceSource('ai'); setAiPricing(null);
     setLocation(''); setLat(null); setLng(null);
     setFiles([]); setPreviews([]); setCreatedListing(null); setError('');
@@ -629,53 +696,268 @@ async function handleCreateListing() {
   );
 
   // Step 3: Upload
-  const renderUploadStep = () => (
+  const renderUploadStep = () => {
+  const verdictConfig = {
+    verified:       { color: '#2A6A2A', bg: '#E8F5E9', label: 'Verified ✓',              canSubmit: true  },
+    low_confidence: { color: '#7A5A00', bg: '#FFF8E1', label: 'Low Confidence — Add more images', canSubmit: false },
+    rejected:       { color: '#8A2020', bg: '#FFEBEE', label: 'Manual Review Required',  canSubmit: false },
+  };
+  const vc = visionResult ? verdictConfig[visionResult.verdict] : null;
+ 
+  return (
     <div className="card">
-      <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Step 3 — Upload Photos</div>
+      <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>
+        Step 3 — Photo Verification
+      </div>
       <div style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>
-        Upload up to 5 photos. Clear images improve matching speed.
+        Upload photos of your waste. Our AI will verify the material type before submission.
+        This step is required and cannot be skipped.
       </div>
-
-      <div
-        onDragOver={e => { e.preventDefault(); setDrag(true); }}
-        onDragLeave={() => setDrag(false)}
-        onDrop={handleDrop}
-        onClick={() => fileRef.current?.click()}
-        style={{
-          border: `2px dashed ${drag ? '#2A6A2A' : '#ddd'}`,
-          borderRadius: '8px', padding: '32px 20px',
-          textAlign: 'center', cursor: 'pointer', marginBottom: 16,
-          background: drag ? '#f0f5ec' : '#fafaf8',
+ 
+      {/* Photo guidelines */}
+      {!visionResult && (
+        <div style={{
+          background: '#f0f5ec',
+          borderRadius: 8,
+          padding: '10px 14px',
+          marginBottom: 14,
+          fontSize: 12,
+          color: '#555',
         }}>
-        <Icon name="camera" size={32} color="#2A6A2A" style={{ marginBottom: 8 }} />
-        <div style={{ fontWeight: 600, fontSize: 14 }}>Drop images here or click to browse</div>
-        <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
-          PNG, JPG up to 10 MB each · Max 5 images
-        </div>
-        <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
-          onChange={e => handleFile(e.target.files)} />
-      </div>
-
-      {previews.length > 0 && (
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
-          {previews.map((src, i) => (
-            <div key={i} style={{ position: 'relative', width: 80, height: 80 }}>
-              <img src={src} alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8 }} />
-              <button onClick={() => removeFile(i)}
-                style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: '#E05050', border: 'none', color: '#fff', fontSize: 12, cursor: 'pointer' }}>×</button>
-            </div>
-          ))}
+          📸 <strong>Photo tips for best verification results:</strong>
+          <ul style={{ margin: '6px 0 0 16px', padding: 0 }}>
+            <li>Place material on a dark contrasting background</li>
+            <li>Fill at least 70% of the frame with the material</li>
+            <li>Upload 3–5 photos from different angles</li>
+            <li>Avoid backlighting and flash glare</li>
+          </ul>
         </div>
       )}
-
-      <div style={{ display: 'flex', gap: 10 }}>
-        <Button variant="secondary" onClick={() => setStep(2)}>← Back to Price</Button>
-        <Button variant="primary" loading={loading} onClick={handleUploadImages}>
-          {files.length > 0 ? 'Upload & Submit' : 'Skip & Submit'}
+ 
+      {/* Upload zone — shown until verification is run */}
+      {!visionResult && (
+        <>
+          <div
+            onDragOver={e => { e.preventDefault(); setDrag(true); }}
+            onDragLeave={() => setDrag(false)}
+            onDrop={handleDrop}
+            onClick={() => fileRef.current?.click()}
+            style={{
+              border: `2px dashed ${drag ? '#2A6A2A' : '#ddd'}`,
+              borderRadius: 8,
+              padding: '32px 20px',
+              textAlign: 'center',
+              cursor: 'pointer',
+              marginBottom: 16,
+              background: drag ? '#f0f5ec' : '#fafaf8',
+            }}
+          >
+            <div style={{ fontSize: 28, marginBottom: 8 }}>📷</div>
+            <div style={{ fontWeight: 600, fontSize: 14 }}>
+              Drop images here or click to browse
+            </div>
+            <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+              PNG, JPG · Upload 3–5 photos from different angles
+            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              multiple
+              style={{ display: 'none' }}
+              onChange={e => handleFile(e.target.files)}
+            />
+          </div>
+ 
+          {/* Thumbnails */}
+          {previews.length > 0 && (
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+              {previews.map((src, i) => (
+                <div key={i} style={{ position: 'relative', width: 80, height: 80 }}>
+                  <img
+                    src={src}
+                    alt=""
+                    style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8 }}
+                  />
+                  <button
+                    onClick={e => { e.stopPropagation(); removeFile(i); }}
+                    style={{
+                      position: 'absolute', top: -6, right: -6,
+                      width: 20, height: 20, borderRadius: '50%',
+                      background: '#E05050', border: 'none',
+                      color: '#fff', fontSize: 12, cursor: 'pointer',
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              ))}
+              <div style={{ fontSize: 12, color: '#666', alignSelf: 'center' }}>
+                {files.length} image{files.length > 1 ? 's' : ''} selected
+              </div>
+            </div>
+          )}
+        </>
+      )}
+ 
+      {/* CV Verification loading */}
+      {visionLoading && (
+        <div style={{ textAlign: 'center', padding: '32px 0' }}>
+          <div className="loading-spinner" style={{ margin: '0 auto 12px', width: 32, height: 32 }} />
+          <div style={{ fontSize: 14, fontWeight: 600, color: '#2A6A2A' }}>
+            Running AI Verification…
+          </div>
+          <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>
+            Analysing {files.length} image{files.length > 1 ? 's' : ''} across SM1 → SM2 → SM3 → SM4
+          </div>
+        </div>
+      )}
+ 
+      {/* CV Error */}
+      {visionError && !visionLoading && (
+        <div style={{
+          background: '#FFEBEE', borderRadius: 8, padding: 14, marginBottom: 14,
+          fontSize: 13, color: '#8A2020',
+        }}>
+          ⚠️ Verification failed: {visionError}
+          <br />
+          <button
+            onClick={() => { clearVision(); }}
+            style={{ marginTop: 8, fontSize: 12, color: '#2A6A2A', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+          >
+            Try again
+          </button>
+        </div>
+      )}
+ 
+      {/* CV Result */}
+      {visionResult && !visionLoading && (
+        <div style={{ marginBottom: 16 }}>
+ 
+          {/* Verdict banner */}
+          <div style={{
+            background: vc.bg,
+            border: `1px solid ${vc.color}`,
+            borderRadius: 8,
+            padding: '12px 16px',
+            marginBottom: 14,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: vc.color }}>
+                {vc.label}
+              </div>
+              <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
+                Detected: <strong>{visionResult.detectedType}</strong>
+                {visionResult.detectedSubtype && ` — ${visionResult.detectedSubtype}`}
+              </div>
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: vc.color }}>
+              {visionResult.confidence}%
+            </div>
+          </div>
+ 
+          {/* Confidence bars */}
+          {[
+            { label: 'Detection Confidence', value: visionResult.confidence },
+            { label: 'Quality Score',         value: visionResult.qualityScore },
+            { label: 'Batch Consistency',     value: visionResult.consistencyScore },
+          ].map(({ label, value }) => (
+            <div key={label} style={{ marginBottom: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                <span style={{ color: '#666' }}>{label}</span>
+                <span style={{ fontWeight: 600, color: value < 65 ? '#C06010' : '#2A6A2A' }}>
+                  {value}%
+                </span>
+              </div>
+              <div style={{ height: 6, background: '#eee', borderRadius: 3 }}>
+                <div style={{
+                  height: 6, borderRadius: 3,
+                  width: `${value}%`,
+                  background: value < 65 ? '#F59E0B' : '#2A6A2A',
+                }} />
+              </div>
+            </div>
+          ))}
+ 
+          {/* Notes from API */}
+          <div style={{
+            background: '#f5f5f5', borderRadius: 8, padding: '10px 12px',
+            fontSize: 12, color: '#555', marginTop: 10,
+          }}>
+            {visionResult.notes}
+          </div>
+ 
+          {/* Rejected guidance */}
+          {visionResult.verdict === 'rejected' && (
+            <div style={{
+              background: '#FFEBEE', borderRadius: 8, padding: '10px 12px',
+              fontSize: 12, color: '#8A2020', marginTop: 10,
+            }}>
+              This listing has been flagged for manual administrator review.
+              You can still submit — an admin will review the images before approval.
+            </div>
+          )}
+ 
+          {/* Low confidence guidance */}
+          {visionResult.verdict === 'low_confidence' && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 12, color: '#7A5A00', marginBottom: 8 }}>
+                Add more photos from different angles to improve your confidence score.
+              </div>
+              <button
+                onClick={() => { clearVision(); }}
+                style={{
+                  fontSize: 12, color: '#2A6A2A', background: '#f0f5ec',
+                  border: '1px solid #2A6A2A', borderRadius: 6,
+                  padding: '6px 12px', cursor: 'pointer',
+                }}
+              >
+                ← Add more photos
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+ 
+      {/* Action buttons */}
+      <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+        <Button variant="secondary" onClick={() => setStep(2)}>
+          ← Back to Price
         </Button>
+ 
+        {/* Run verification — shown when images uploaded but not yet verified */}
+        {!visionResult && !visionLoading && (
+          <Button
+            variant="primary"
+            loading={visionLoading}
+            disabled={files.length === 0 || visionLoading}
+            onClick={handleUploadImages}
+          >
+            {files.length === 0
+              ? 'Upload images to verify'
+              : `Verify ${files.length} Image${files.length > 1 ? 's' : ''} with AI`}
+          </Button>
+        )}
+ 
+        {/* Submit — only shown after successful verification */}
+        {visionResult && !visionLoading && (
+          <Button
+            variant="primary"
+            loading={loading}
+            onClick={handleConfirmSubmit}
+          >
+            {visionResult.verdict === 'verified'
+              ? 'Confirm & Submit Listing →'
+              : 'Submit for Manual Review →'}
+          </Button>
+        )}
       </div>
     </div>
   );
+};
 
   // Step 4: Done
   const renderDoneStep = () => (
