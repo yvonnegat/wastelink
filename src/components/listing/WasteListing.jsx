@@ -1,21 +1,59 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { WASTE_TYPES } from '../../data/mockData';
 import { Button, StepIndicator, Alert } from '../common';
 import Icon from '../common/Icon';
 import { listingsService } from '../../services/ListingService';
+import { getPrice } from '../../services/pricingService';
 
-const STEPS = ['Details', 'Upload', 'Done'];
+const STEPS = ['Details', 'Price', 'Upload', 'Done'];
+
 const CONDITIONS = [
-  { label: 'Clean / Sorted',    value: 'clean'        },
-  { label: 'Mixed / Unsorted',  value: 'mixed'        },
-  { label: 'Contaminated',      value: 'contaminated' },
-  { label: 'Baled / Compressed',value: 'baled'        },
+  { label: 'Clean / Sorted', value: 'clean' },
+  { label: 'Mixed / Unsorted', value: 'mixed' },
+  { label: 'Contaminated', value: 'contaminated' },
+  { label: 'Baled / Compressed', value: 'baled' },
 ];
-// ── Convert WASTE_TYPES object → array ────────────────────────────
-// mockData exports: { Plastic: ['PET Bottles', ...], Paper: [...] }
-// We need:          [{ label: 'Plastic', subtypes: [...] }, ...]
+
+const COLLECTION_POINTS = [
+  { value: 'commercial', label: '🏢 Commercial', desc: 'Business waste, regular pickup' },
+  { value: 'industrial', label: '🏭 Industrial', desc: 'Factory/manufacturing waste, bulk volume' },
+  { value: 'household', label: '🏠 Household', desc: 'Residential, small quantities' },
+];
+
+const COUNTIES = [
+  'Nairobi', 'Mombasa', 'Kisumu', 'Kiambu', 'Nakuru', 'Eldoret', 
+  'Machakos', 'Kajiado', 'Tharaka Nithi', 'Meru', 'Nyeri', 'Kirinyaga'
+];
+
+const SUBTYPE_MAP = {
+  'PET Bottles': 'PET',
+  'HDPE': 'HDPE',
+  'PVC': 'PVC',
+  'LDPE': 'LDPE',
+  'PP': 'PP',
+  'PS': 'PS',
+  'Cardboard': 'cardboard',
+  'Newspaper': 'newspaper',
+  'Office Paper': 'office_paper',
+  'Magazines': 'magazines',
+  'Aluminium Cans': 'aluminium',
+  'Iron Scrap': 'iron',
+  'Copper Wire': 'copper',
+  'Steel': 'steel',
+  'Clear Glass': 'clear_glass',
+  'Brown Glass': 'brown_glass',
+  'Green Glass': 'green_glass',
+  'Food Waste': 'food_waste',
+  'Garden Waste': 'garden_waste',
+  'Wood': 'wood',
+  'Phones': 'phones',
+  'Computers': 'computers',
+  'Batteries': 'batteries',
+  'Cables': 'cables',
+};
+
 function buildWasteTypeArray(wasteTypesData) {
-  if (Array.isArray(wasteTypesData)) return wasteTypesData; // already an array
+  if (Array.isArray(wasteTypesData)) return wasteTypesData;
   if (typeof wasteTypesData === 'object' && wasteTypesData !== null) {
     return Object.entries(wasteTypesData).map(([label, subtypes]) => ({
       label,
@@ -26,30 +64,120 @@ function buildWasteTypeArray(wasteTypesData) {
 }
 
 const EMOJI_MAP = {
-  Plastic:  '🧴', Paper: '📄', Metal: '⚙️', Glass: '🫙',
-  Organic:  '🌿', 'E-Waste': '📱', Textile: '👕', Rubber: '🔧',
+  Plastic: '🧴', Paper: '📄', Metal: '⚙️', Glass: '🫙',
+  Organic: '🌿', 'E-Waste': '📱', Textile: '👕', Rubber: '🔧',
 };
 
 export default function WasteListing({ onNavigate }) {
   const wasteTypeArray = useMemo(() => buildWasteTypeArray(WASTE_TYPES), []);
 
-  const [step, setStep]           = useState(1);
+  // Step 1 state
+  const [step, setStep] = useState(1);
   const [wasteType, setWasteType] = useState('');
-  const [subtype, setSubtype]     = useState('');
-  const [qty, setQty]             = useState('');
-const [condition, setCondition] = useState('clean');
-  const [notes, setNotes]         = useState('');
-  const [price, setPrice]         = useState('');
-  const [files, setFiles]         = useState([]);
-  const [previews, setPreviews]   = useState([]);
-  const [drag, setDrag]           = useState(false);
-  const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState('');
-  const [createdId, setCreatedId] = useState(null);
+  const [subtype, setSubtype] = useState('');
+  const [qty, setQty] = useState('');
+  const [condition, setCondition] = useState('clean');
+  const [collectionPoint, setCollectionPoint] = useState('commercial');
+  const [county, setCounty] = useState('Nairobi');
+  const [distanceKm, setDistanceKm] = useState(5);
+  const [notes, setNotes] = useState('');
+  
+  // Location state
+  const [location, setLocation] = useState('');
+  const [lat, setLat] = useState(null);
+  const [lng, setLng] = useState(null);
+  const [isLocating, setIsLocating] = useState(false);
+  
+  // AI Pricing state
+  const [aiPricing, setAiPricing] = useState(null);
+  const [pricingLoading, setPricingLoading] = useState(false);
+  const [selectedPricePerKg, setSelectedPricePerKg] = useState(null);
+  const [priceSource, setPriceSource] = useState('ai');
+  const [manualPricePerKg, setManualPricePerKg] = useState('');
+  
+  // Listing state
+  const [createdListing, setCreatedListing] = useState(null);
+  const [files, setFiles] = useState([]);
+  const [previews, setPreviews] = useState([]);
+  const [drag, setDrag] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
   const fileRef = useRef();
 
-  // Selected type entry for subtypes
   const selectedType = wasteTypeArray.find(w => w.label === wasteType);
+  const quantityNum = parseFloat(qty) || 0;
+
+  // Get current location
+  const getCurrentLocation = () => {
+    setIsLocating(true);
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser');
+      setIsLocating(false);
+      return;
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        setLat(latitude);
+        setLng(longitude);
+        
+        // Reverse geocode to get address
+        try {
+          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+          const data = await response.json();
+          if (data && data.display_name) {
+            setLocation(data.display_name);
+          } else {
+            setLocation(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+          }
+        } catch (error) {
+          console.error('Reverse geocoding error:', error);
+          setLocation(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+        }
+        setIsLocating(false);
+      },
+      (error) => {
+        console.error('Geolocation error:', error);
+        alert('Unable to get your location. Please enter manually.');
+        setIsLocating(false);
+      }
+    );
+  };
+
+  // Fetch AI price when inputs change
+  useEffect(() => {
+    const fetchAiPrice = async () => {
+      if (!wasteType || !qty || quantityNum <= 0) return;
+      
+      setPricingLoading(true);
+      try {
+        const result = await getPrice({
+          wasteType,
+          subtype,
+          quantity: quantityNum,
+          condition,
+          county,
+          collectionPoint,
+        });
+        
+        setAiPricing(result);
+        const recommendedPerKg = result.perKgRange?.recommended || result.priceRange?.recommended;
+        
+        if (priceSource === 'ai' && !selectedPricePerKg) {
+          setSelectedPricePerKg(recommendedPerKg);
+        }
+      } catch (err) {
+        console.error('AI pricing failed:', err);
+        setAiPricing(null);
+      } finally {
+        setPricingLoading(false);
+      }
+    };
+    
+    const timeout = setTimeout(fetchAiPrice, 500);
+    return () => clearTimeout(timeout);
+  }, [wasteType, subtype, qty, condition, county, collectionPoint]);
 
   function handleFile(newFiles) {
     const valid = Array.from(newFiles).filter(f => f.type.startsWith('image/'));
@@ -72,40 +200,118 @@ const [condition, setCondition] = useState('clean');
     setPreviews(prev => prev.filter((_, idx) => idx !== i));
   }
 
-  async function handleStep1() {
-    if (!wasteType) { setError('Please select a waste type'); return; }
-    if (!qty || parseFloat(qty) <= 0) { setError('Please enter a valid quantity'); return; }
+  // STEP 1: Create listing with all details including location
+  // STEP 1: Create listing with all details including location
+async function handleCreateListing() {
+  if (!wasteType) { setError('Please select a waste type'); return; }
+  if (!qty || quantityNum <= 0) { setError('Please enter a valid quantity'); return; }
+  if (!location && !lat) { setError('Please enter your pickup location'); return; }
+  
+  const mappedSubtype = subtype ? (SUBTYPE_MAP[subtype] || subtype) : 'Mixed';
+  
+  setError('');
+  setLoading(true);
+  
+  try {
+    const listingPayload = {
+      waste_type: wasteType,
+      subtype: mappedSubtype,
+      quantity_kg: quantityNum,
+      condition: condition,
+      collection_point: collectionPoint,  // ✅ ADD THIS - it was missing!
+      county: county,
+      location: location || `${county}, Kenya`,
+      // Only include lat/lng if they have values
+      ...(lat && { lat: lat }),
+      ...(lng && { lng: lng }),
+    };
+    
+    console.log('📦 Creating listing with payload:', listingPayload);
+    const listing = await listingsService.create(listingPayload);
+    console.log('✅ Listing created:', listing);
+    
+    setCreatedListing(listing);
+    setStep(2);
+  } catch (e) {
+    console.error('❌ Failed to create listing:', e);
+    setError(e.message || 'Failed to create listing. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+}
+
+  // STEP 2: Accept price
+  async function handleAcceptPrice() {
+    if (!createdListing) {
+      setError('Listing not found. Please go back and recreate.');
+      return;
+    }
+    
+    let finalPricePerKg = null;
+    if (priceSource === 'ai' && selectedPricePerKg) {
+      finalPricePerKg = selectedPricePerKg;
+    } else if (priceSource === 'manual' && manualPricePerKg) {
+      finalPricePerKg = parseFloat(manualPricePerKg);
+    }
+    
+    if (!finalPricePerKg || finalPricePerKg <= 0) {
+      setError('Please select or enter a valid price');
+      return;
+    }
+    
+    const finalPriceTotal = finalPricePerKg * quantityNum;
+    
     setError('');
     setLoading(true);
     try {
-      const listing = await listingsService.create({
-        waste_type:  wasteType,
-        subtype:     subtype || null,
-        quantity_kg: parseFloat(qty),
-        condition,
-        notes:       notes || null,
-        price_per_kg: price ? parseFloat(price) : null,
-      });
-      setCreatedId(listing.id);
-      setStep(2);
+      const pricePayload = {
+        price_per_kg: finalPricePerKg,
+        final_price: finalPriceTotal,
+        base_price: aiPricing?.baseRate || finalPricePerKg,
+        quality_adjustment: aiPricing?.adjustments?.quality || 0,
+        volume_adjustment: aiPricing?.adjustments?.volume || 0,
+      };
+      
+      console.log('💰 Accepting price:', pricePayload);
+      const updatedListing = await listingsService.acceptPrice(createdListing.id, pricePayload);
+      console.log('✅ Price accepted:', updatedListing);
+      
+      setCreatedListing(updatedListing);
+      setStep(3);
     } catch (e) {
-      setError(e.message || 'Failed to create listing. Please try again.');
+      console.error('❌ Failed to accept price:', e);
+      setError(e.message || 'Failed to save price. Please try again.');
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleStep2() {
+  // STEP 3: Upload images
+  async function handleUploadImages() {
+    if (!createdListing) {
+      setError('Listing not found. Please go back and recreate.');
+      return;
+    }
+    
     setError('');
     setLoading(true);
     try {
       if (files.length > 0) {
-        await listingsService.uploadImages(createdId, files);
+        console.log('📸 Uploading images...', files.length);
+        await listingsService.uploadImages(createdListing.id, files);
+        console.log('✅ Images uploaded');
       }
-      await listingsService.submit(createdId);
-      setStep(3);
+      
+      if (files.length === 0) {
+        console.log('📤 No images, submitting listing...');
+        await listingsService.submit(createdListing.id);
+      }
+      
+      setStep(4);
     } catch (e) {
+      console.error('❌ Upload failed:', e);
       setError(e.message || 'Upload failed. Your listing was saved — you can skip images.');
+      setStep(4);
     } finally {
       setLoading(false);
     }
@@ -113,17 +319,388 @@ const [condition, setCondition] = useState('clean');
 
   function reset() {
     setStep(1); setWasteType(''); setSubtype(''); setQty('');
-    setCondition('clean'); setNotes(''); setPrice('');
-    setFiles([]); setPreviews([]); setCreatedId(null); setError('');
+    setCondition('clean'); setCollectionPoint('commercial'); setCounty('Nairobi');
+    setDistanceKm(5); setNotes(''); setSelectedPricePerKg(null); 
+    setManualPricePerKg(''); setPriceSource('ai'); setAiPricing(null);
+    setLocation(''); setLat(null); setLng(null);
+    setFiles([]); setPreviews([]); setCreatedListing(null); setError('');
   }
+
+  const formatKES = (amount) => `KES ${Math.round(amount).toLocaleString()}`;
+
+  // Step 1: Details with Location
+  const renderDetailsStep = () => (
+    <div className="card">
+      <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Step 1 — Waste Details</div>
+
+      <div className="form-group">
+        <label className="form-label">Waste Type *</label>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 8 }}>
+          {wasteTypeArray.map((wt) => (
+            <div key={wt.label}
+              onClick={() => { setWasteType(wt.label); setSubtype(''); }}
+              style={{
+                padding: '10px 8px', cursor: 'pointer', textAlign: 'center',
+                border: `2px solid ${wasteType === wt.label ? 'var(--olive)' : 'var(--border)'}`,
+                borderRadius: 'var(--r2)',
+                background: wasteType === wt.label ? 'var(--olive-bg)' : 'var(--white)',
+              }}>
+              <div style={{ fontSize: 20 }}>{EMOJI_MAP[wt.label] || '♻️'}</div>
+              <div style={{ fontSize: 12, fontWeight: 600, marginTop: 4 }}>
+                {wt.label}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {selectedType?.subtypes?.length > 0 && (
+        <div className="form-group">
+          <label className="form-label">Subtype</label>
+          <select className="form-input" value={subtype} onChange={e => setSubtype(e.target.value)}>
+            <option value="">Select subtype…</option>
+            {selectedType.subtypes.map(s => <option key={s}>{s}</option>)}
+          </select>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <div className="form-group">
+          <label className="form-label">Quantity (kg) *</label>
+          <input className="form-input" type="number" min="0.1" step="0.1" value={qty}
+            onChange={e => setQty(e.target.value)} placeholder="e.g., 50" />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Condition *</label>
+          <select className="form-input" value={condition} onChange={e => setCondition(e.target.value)}>
+            {CONDITIONS.map(c => (
+              <option key={c.value} value={c.value}>{c.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Location Section */}
+      <div className="form-group">
+        <label className="form-label">Pickup Location *</label>
+        <button
+          type="button"
+          onClick={getCurrentLocation}
+          disabled={isLocating}
+          style={{
+            width: '100%',
+            padding: '10px',
+            marginBottom: '12px',
+            background: '#f0f5ec',
+            border: '1px solid #2A6A2A',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontSize: '14px',
+            fontWeight: '500',
+            color: '#2A6A2A',
+          }}
+        >
+          {isLocating ? '📍 Getting your location...' : '📍 Use My Current Location'}
+        </button>
+        
+        <input
+          className="form-input"
+          type="text"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+          placeholder="Enter your pickup address (e.g., Westlands, Nairobi)"
+        />
+        
+        {lat && lng && (
+          <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
+            📍 Coordinates: {lat.toFixed(6)}, {lng.toFixed(6)}
+          </div>
+        )}
+      </div>
+
+      <div className="form-group">
+        <label className="form-label">County</label>
+        <select className="form-input" value={county} onChange={e => setCounty(e.target.value)}>
+          {COUNTIES.map(c => <option key={c}>{c}</option>)}
+        </select>
+      </div>
+
+      <div className="form-group">
+        <label className="form-label">Collection Point Type *</label>
+        <select 
+          className="form-input" 
+          value={collectionPoint} 
+          onChange={e => setCollectionPoint(e.target.value)}
+        >
+          {COLLECTION_POINTS.map(cp => (
+            <option key={cp.value} value={cp.value}>
+              {cp.label} - {cp.desc}
+            </option>
+          ))}
+        </select>
+        <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
+          💡 Industrial and commercial waste gets better rates
+        </div>
+      </div>
+
+      
+
+      <div className="form-group">
+        <label className="form-label">Notes (optional)</label>
+        <textarea className="form-input" rows={3} value={notes}
+          onChange={e => setNotes(e.target.value)}
+          placeholder="Any additional details about the waste…" />
+      </div>
+
+      <Button variant="primary" loading={loading} onClick={handleCreateListing}>
+        Continue to Pricing →
+      </Button>
+    </div>
+  );
+
+  // Step 2: Pricing
+  const renderPricingStep = () => (
+    <div className="card">
+      <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>
+        Step 2 — Confirm Your Price
+        {pricingLoading && <span style={{ marginLeft: 10, fontSize: 12, color: '#666' }}>🤖 AI analyzing market...</span>}
+      </div>
+
+      {aiPricing && !pricingLoading ? (
+        <>
+          {aiPricing.marketInfo && (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+              <span style={{
+                padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+                background: aiPricing.marketInfo.tier === 'formal' ? '#E8F5E9' : 
+                           aiPricing.marketInfo.tier === 'semi_formal' ? '#FFF8E1' : '#FFF3E0',
+                color: aiPricing.marketInfo.tier === 'formal' ? '#2A6A2A' : 
+                       aiPricing.marketInfo.tier === 'semi_formal' ? '#7A5A00' : '#8A4000',
+              }}>
+                {aiPricing.marketInfo.tier?.replace('_', ' ')} tier
+              </span>
+              <span style={{
+                padding: '4px 12px', borderRadius: 20, fontSize: 12, background: '#F5F5F5',
+                color: aiPricing.marketInfo.signal === 'stable' ? '#2A6A2A' : 
+                       aiPricing.marketInfo.signal === 'moderate' ? '#7A5A00' : '#8A2020',
+              }}>
+                {aiPricing.marketInfo.signal} market
+              </span>
+            </div>
+          )}
+
+          <div style={{
+            background: '#f0f5ec',
+            padding: 16, borderRadius: 12, marginBottom: 16,
+            border: '1px solid #c8e0c8'
+          }}>
+            <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>
+              🤖 AI Market Recommendation
+            </div>
+            <div style={{ fontSize: 14, color: '#444', marginBottom: 4 }}>
+              Rate per kilogram
+            </div>
+            <div style={{ fontSize: 32, fontWeight: 700, color: '#2A6A2A' }}>
+              {formatKES(aiPricing.perKgRange?.recommended || aiPricing.priceRange?.recommended)}/kg
+            </div>
+            {quantityNum > 1 && (
+              <div style={{ fontSize: 13, color: '#444', marginTop: 8 }}>
+                Total for {quantityNum} kg: <strong>{formatKES((aiPricing.perKgRange?.recommended || aiPricing.priceRange?.recommended) * quantityNum)}</strong>
+              </div>
+            )}
+            {aiPricing.priceRange && (
+              <div style={{ fontSize: 12, color: '#666', marginTop: 8 }}>
+                Market range: KES {aiPricing.priceRange.lower} – {aiPricing.priceRange.upper}/kg
+              </div>
+            )}
+          </div>
+
+          {aiPricing.marketInfo?.advice && (
+            <Alert type="info" style={{ marginBottom: 16, fontSize: 12 }}>
+              💡 {aiPricing.marketInfo.advice}
+            </Alert>
+          )}
+
+          <div style={{ marginBottom: 16 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+              <input
+                type="radio"
+                checked={priceSource === 'ai'}
+                onChange={() => {
+                  setPriceSource('ai');
+                  setSelectedPricePerKg(aiPricing.perKgRange?.recommended || aiPricing.priceRange?.recommended);
+                }}
+              />
+              <span>
+                Use AI recommended price <strong>{formatKES(aiPricing.perKgRange?.recommended || aiPricing.priceRange?.recommended)}/kg</strong>
+              </span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <input
+                type="radio"
+                checked={priceSource === 'manual'}
+                onChange={() => {
+                  setPriceSource('manual');
+                  setSelectedPricePerKg(null);
+                }}
+              />
+              <span>Set my own price (KES/kg)</span>
+            </label>
+          </div>
+
+          {priceSource === 'manual' && (
+            <div className="form-group">
+              <label className="form-label">Your Price (KES per kg)</label>
+              <input
+                className="form-input"
+                type="number"
+                min="0"
+                step="0.5"
+                value={manualPricePerKg}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  setManualPricePerKg(e.target.value);
+                  setSelectedPricePerKg(isNaN(val) ? null : val);
+                }}
+                placeholder={`e.g., ${Math.round((aiPricing.perKgRange?.recommended || 13) * 0.9)}`}
+              />
+            </div>
+          )}
+
+          {selectedPricePerKg && (
+          <div style={{
+            marginTop: 16, padding: 12, borderRadius: 8,
+            background: '#f5f5f5', fontSize: 13
+          }}>
+            <strong>Your selected price:</strong><br />
+            {formatKES(selectedPricePerKg)}/kg × {quantityNum} kg = <strong>{formatKES(selectedPricePerKg * quantityNum)} total</strong>
+          </div>
+        )}
+
+          <div style={{ marginTop: 16, marginBottom: 24, fontSize: 12, color: '#666' }}>
+            Model confidence: {Math.round((aiPricing.confidence || 0.85) * 100)}%
+          </div>
+        </>
+      ) : pricingLoading ? (
+        <div style={{ textAlign: 'center', padding: '40px 0' }}>
+          <div className="loading-spinner" style={{ margin: '0 auto' }} />
+          <div style={{ marginTop: 12, color: '#666' }}>
+            Fetching real-time market rates...
+          </div>
+        </div>
+      ) : (
+        <div>
+          <Alert type="warn" style={{ marginBottom: 16 }}>
+            AI pricing temporarily unavailable. Please enter price manually.
+          </Alert>
+          <div className="form-group">
+            <label className="form-label">Your Price (KES per kg)</label>
+            <input
+              className="form-input"
+              type="number"
+              min="0"
+              step="0.5"
+              value={manualPricePerKg}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value);
+                setManualPricePerKg(e.target.value);
+                setSelectedPricePerKg(isNaN(val) ? null : val);
+              }}
+              placeholder="e.g., 45"
+            />
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
+        <Button variant="secondary" onClick={() => setStep(1)}>
+          ← Back to Details
+        </Button>
+        <Button 
+          variant="primary" 
+          onClick={handleAcceptPrice}
+          loading={loading}
+          disabled={!selectedPricePerKg && priceSource === 'manual' && !manualPricePerKg}
+        >
+          Accept Price & Continue →
+        </Button>
+      </div>
+    </div>
+  );
+
+  // Step 3: Upload
+  const renderUploadStep = () => (
+    <div className="card">
+      <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Step 3 — Upload Photos</div>
+      <div style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>
+        Upload up to 5 photos. Clear images improve matching speed.
+      </div>
+
+      <div
+        onDragOver={e => { e.preventDefault(); setDrag(true); }}
+        onDragLeave={() => setDrag(false)}
+        onDrop={handleDrop}
+        onClick={() => fileRef.current?.click()}
+        style={{
+          border: `2px dashed ${drag ? '#2A6A2A' : '#ddd'}`,
+          borderRadius: '8px', padding: '32px 20px',
+          textAlign: 'center', cursor: 'pointer', marginBottom: 16,
+          background: drag ? '#f0f5ec' : '#fafaf8',
+        }}>
+        <Icon name="camera" size={32} color="#2A6A2A" style={{ marginBottom: 8 }} />
+        <div style={{ fontWeight: 600, fontSize: 14 }}>Drop images here or click to browse</div>
+        <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+          PNG, JPG up to 10 MB each · Max 5 images
+        </div>
+        <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
+          onChange={e => handleFile(e.target.files)} />
+      </div>
+
+      {previews.length > 0 && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+          {previews.map((src, i) => (
+            <div key={i} style={{ position: 'relative', width: 80, height: 80 }}>
+              <img src={src} alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8 }} />
+              <button onClick={() => removeFile(i)}
+                style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: '#E05050', border: 'none', color: '#fff', fontSize: 12, cursor: 'pointer' }}>×</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 10 }}>
+        <Button variant="secondary" onClick={() => setStep(2)}>← Back to Price</Button>
+        <Button variant="primary" loading={loading} onClick={handleUploadImages}>
+          {files.length > 0 ? 'Upload & Submit' : 'Skip & Submit'}
+        </Button>
+      </div>
+    </div>
+  );
+
+  // Step 4: Done
+  const renderDoneStep = () => (
+    <div className="card" style={{ textAlign: 'center', padding: '40px 24px' }}>
+      <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#E0F0E0', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+        <Icon name="check" size={32} color="#2A6A2A" strokeWidth={2.5} />
+      </div>
+      <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Listing Submitted!</div>
+      <div style={{ color: '#666', fontSize: 14, marginBottom: 24 }}>
+        Your listing is pending verification. We'll notify you once it's approved.
+      </div>
+      <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+        <Button variant="primary" onClick={reset}>List Another</Button>
+        <Button variant="secondary" onClick={() => onNavigate('dashboard')}>Dashboard</Button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="page">
       <div className="section-hd" style={{ marginBottom: 20 }}>
         <div>
           <div className="page-heading">List Your Waste</div>
-          <div style={{ fontSize: 13, color: 'var(--text3)', marginTop: 2 }}>
-            Get verified, priced &amp; matched with recyclers
+          <div style={{ fontSize: 13, color: '#666', marginTop: 2 }}>
+            Get AI-powered pricing &amp; matched with recyclers
           </div>
         </div>
       </div>
@@ -132,144 +709,10 @@ const [condition, setCondition] = useState('clean');
 
       {error && <Alert type="warn" style={{ margin: '16px 0' }}>{error}</Alert>}
 
-      {/* ── Step 1: Details ─────────────────────────────────────── */}
-      {step === 1 && (
-        <div className="card">
-          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Step 1 — Waste Details</div>
-
-          <div className="form-group">
-            <label className="form-label">Waste Type *</label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 8 }}>
-              {wasteTypeArray.map((wt) => (
-                <div key={wt.label}
-                  onClick={() => { setWasteType(wt.label); setSubtype(''); }}
-                  style={{
-                    padding: '10px 8px', cursor: 'pointer', textAlign: 'center',
-                    border: `2px solid ${wasteType === wt.label ? 'var(--olive)' : 'var(--border)'}`,
-                    borderRadius: 'var(--r2)',
-                    background: wasteType === wt.label ? 'var(--olive-bg)' : 'var(--white)',
-                    transition: 'all .18s',
-                  }}>
-                  <div style={{ fontSize: 20 }}>{EMOJI_MAP[wt.label] || '♻️'}</div>
-                  <div style={{ fontSize: 12, fontWeight: 600, marginTop: 4, color: wasteType === wt.label ? 'var(--olive-deep)' : 'var(--text)' }}>
-                    {wt.label}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {selectedType?.subtypes?.length > 0 && (
-            <div className="form-group">
-              <label className="form-label">Subtype</label>
-              <select className="form-input" value={subtype} onChange={e => setSubtype(e.target.value)}>
-                <option value="">Select subtype…</option>
-                {selectedType.subtypes.map(s => <option key={s}>{s}</option>)}
-              </select>
-            </div>
-          )}
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <div className="form-group">
-              <label className="form-label">Quantity (kg) *</label>
-              <input className="form-input" type="number" min="0.1" step="0.1" value={qty}
-                onChange={e => setQty(e.target.value)} placeholder="e.g. 50" />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Asking Price (KES/kg)</label>
-              <input className="form-input" type="number" min="0" step="0.5" value={price}
-                onChange={e => setPrice(e.target.value)} placeholder="Optional" />
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Condition</label>
-            <select className="form-input" value={condition} onChange={e => setCondition(e.target.value)}>
-              {CONDITIONS.map(c => (
-                <option key={c.value} value={c.value}>{c.label}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Notes</label>
-            <textarea className="form-input" rows={3} value={notes}
-              onChange={e => setNotes(e.target.value)}
-              placeholder="Any additional details about the waste…" />
-          </div>
-
-          <Button variant="primary" loading={loading} onClick={handleStep1}>
-            Continue to Upload →
-          </Button>
-        </div>
-      )}
-
-      {/* ── Step 2: Upload ──────────────────────────────────────── */}
-      {step === 2 && (
-        <div className="card">
-          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Step 2 — Upload Photos</div>
-          <div style={{ fontSize: 13, color: 'var(--text3)', marginBottom: 16 }}>
-            Upload up to 5 photos. Clear images improve matching speed. You can skip this step.
-          </div>
-
-          <div
-            onDragOver={e => { e.preventDefault(); setDrag(true); }}
-            onDragLeave={() => setDrag(false)}
-            onDrop={handleDrop}
-            onClick={() => fileRef.current?.click()}
-            style={{
-              border: `2px dashed ${drag ? 'var(--olive)' : 'var(--border)'}`,
-              borderRadius: 'var(--r)', padding: '32px 20px',
-              textAlign: 'center', cursor: 'pointer', marginBottom: 16,
-              background: drag ? 'var(--olive-bg)' : 'var(--cream)',
-              transition: 'all .2s',
-            }}>
-            <Icon name="camera" size={32} color="var(--olive)" style={{ marginBottom: 8 }} />
-            <div style={{ fontWeight: 600, fontSize: 14 }}>Drop images here or click to browse</div>
-            <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4 }}>
-              PNG, JPG up to 10 MB each · Max 5 images
-            </div>
-            <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
-              onChange={e => handleFile(e.target.files)} />
-          </div>
-
-          {previews.length > 0 && (
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
-              {previews.map((src, i) => (
-                <div key={i} style={{ position: 'relative', width: 80, height: 80 }}>
-                  <img src={src} alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, border: '2px solid var(--border)' }} />
-                  <button onClick={() => removeFile(i)}
-                    style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: '#E05050', border: 'none', color: '#fff', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>×</button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div style={{ display: 'flex', gap: 10 }}>
-            <Button variant="secondary" onClick={() => setStep(1)}>← Back</Button>
-            <Button variant="primary" loading={loading} onClick={handleStep2}>
-              {files.length > 0 ? 'Upload & Submit' : 'Skip & Submit'}
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Step 3: Done ────────────────────────────────────────── */}
-      {step === 3 && (
-        <div className="card" style={{ textAlign: 'center', padding: '40px 24px' }}>
-          <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#E0F0E0', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-            <Icon name="check" size={32} color="#2A6A2A" strokeWidth={2.5} />
-          </div>
-          <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Listing Submitted!</div>
-          <div style={{ color: 'var(--text3)', fontSize: 14, marginBottom: 24 }}>
-            Your listing is pending verification. We'll notify you once it's approved and visible to recyclers.
-          </div>
-          <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-            <Button variant="primary" onClick={reset}>List Another</Button>
-            <Button variant="secondary" onClick={() => onNavigate('dashboard')}>Back to Dashboard</Button>
-          </div>
-        </div>
-      )}
+      {step === 1 && renderDetailsStep()}
+      {step === 2 && renderPricingStep()}
+      {step === 3 && renderUploadStep()}
+      {step === 4 && renderDoneStep()}
     </div>
   );
 }
