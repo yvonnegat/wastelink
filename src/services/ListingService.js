@@ -1,3 +1,4 @@
+// services/ListingService.js
 import api from './apiClient';
 
 export const listingsService = {
@@ -18,6 +19,7 @@ export const listingsService = {
   },
 
   create(payload) {
+    console.log('📦 Creating listing via API client:', payload);
     return api.post('/listings', payload);
   },
 
@@ -44,6 +46,7 @@ export const listingsService = {
   },
 
   acceptPrice(id, payload) {
+    console.log('💰 Accepting price via API client:', payload);
     return api.post(`/listings/${id}/accept-price`, payload);
   },
 };
