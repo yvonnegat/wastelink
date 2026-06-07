@@ -17,11 +17,7 @@ const PAGE_TITLES = {
 };
 
 export default function Topbar({ activePage, userRole, onRoleSwitch, onNavigate }) {
-  const { user, logout } = useAuth();
-
-  async function handleLogout() {
-    await logout();
-  }
+  const { user } = useAuth();
 
   return (
     <header className="topbar">
@@ -43,12 +39,9 @@ export default function Topbar({ activePage, userRole, onRoleSwitch, onNavigate 
         {/* Notifications */}
         <NotificationPanel />
 
-        {/* Profile & Logout */}
+        {/* Profile */}
         <button className="notif-btn" onClick={() => onNavigate('profile')} title="My Profile">
           <Icon name="user" size={18} />
-        </button>
-        <button className="notif-btn" onClick={handleLogout} title="Logout" style={{ color: 'var(--text3)' }}>
-          <Icon name="logout" size={18} />
         </button>
       </div>
     </header>

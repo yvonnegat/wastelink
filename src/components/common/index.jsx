@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import Icon from './Icon';
 
+
 // ── BUTTON ──────────────────────────────────────────────────────────
 export function Button({ children, variant = 'primary', size = '', full = false, loading = false, icon, onClick, disabled, type = 'button' }) {
   const classes = ['btn', `btn-${variant}`, size && `btn-${size}`, full && 'btn-full'].filter(Boolean).join(' ');

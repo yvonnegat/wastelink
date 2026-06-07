@@ -1,0 +1,217 @@
+/* Toast.css - Professional & Modern */
+
+.toast-container {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+}
+
+/* =========================
+   BASE TOAST
+========================= */
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 320px;
+  max-width: 420px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: 'DM Sans', sans-serif;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12), 0 2px 4px rgba(0, 0, 0, 0.05);
+  animation: slideInRight 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  pointer-events: auto;
+  position: relative;
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+  transition: all 0.2s ease;
+}
+
+.toast:hover {
+  transform: translateX(-2px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.15);
+}
+
+/* =========================
+   VARIANTS
+========================= */
+.toast.success {
+  background: linear-gradient(135deg, #1a7a4a 0%, #2e9e60 100%);
+  border-left: 4px solid #d0eddb;
+}
+
+.toast.error {
+  background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+  border-left: 4px solid #fecaca;
+}
+
+.toast.warning {
+  background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);
+  color: #1f2937;
+  border-left: 4px solid #fef3c7;
+}
+
+.toast.info {
+  background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+  border-left: 4px solid #dbeafe;
+}
+
+/* =========================
+   ICON
+========================= */
+.toast-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.2);
+  flex-shrink: 0;
+}
+
+.toast-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* =========================
+   TEXT
+========================= */
+.toast span {
+  flex: 1;
+  line-height: 1.4;
+  letter-spacing: -0.2px;
+}
+
+/* =========================
+   CLOSE BUTTON
+========================= */
+.toast-close {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.toast-close:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  transform: scale(1.05);
+}
+
+/* =========================
+   PROGRESS BAR
+========================= */
+.toast::before {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.4);
+  animation: progress 4s linear forwards;
+}
+
+.toast.success::before {
+  background: #d0eddb;
+}
+
+.toast.error::before {
+  background: #fecaca;
+}
+
+.toast.warning::before {
+  background: #fef3c7;
+}
+
+/* =========================
+   ANIMATIONS
+========================= */
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(60px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOutRight {
+  to {
+    opacity: 0;
+    transform: translateX(60px);
+  }
+}
+
+@keyframes progress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+/* =========================
+   STACKING ANIMATION
+========================= */
+.toast:first-child {
+  animation: slideInRight 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.toast:not(:first-child) {
+  animation: slideInRight 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+/* =========================
+   MOBILE RESPONSIVE
+========================= */
+@media (max-width: 640px) {
+  .toast-container {
+    right: 16px;
+    left: 16px;
+    top: 16px;
+  }
+
+  .toast {
+    min-width: unset;
+    width: 100%;
+    max-width: none;
+    padding: 12px 16px;
+  }
+
+  .toast-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .toast span {
+    font-size: 13px;
+  }
+}
+
+/* =========================
+   DARK MODE SUPPORT
+========================= */
+@media (prefers-color-scheme: dark) {
+  .toast {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  }
+}
