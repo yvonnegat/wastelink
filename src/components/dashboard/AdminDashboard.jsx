@@ -15,7 +15,7 @@ export default function AdminDashboard({ user, onNavigate }) {
   useEffect(() => {
     Promise.all([
       adminService.getStats().catch(() => null),
-      adminService.getListings({ status: 'pending_verification', limit: 5 }).catch(() => null),
+      adminService.getListings({ limit: 20 }).catch(() => null),
       adminService.getUsers({ limit: 5 }).catch(() => null),
     ]).then(([s, l, u]) => {
       setStats(s);
@@ -74,20 +74,142 @@ export default function AdminDashboard({ user, onNavigate }) {
         {/* Listings awaiting verification */}
         <div className="card">
           <div className="section-hd">
-            <div className="section-title">Pending Verification</div>
+            <div className="section-title">Listings Queue</div>
             <button className="link-btn" onClick={() => onNavigate('admin')}>View all →</button>
           </div>
-          {listings.length === 0 ? (
-            <div style={{ color: 'var(--text3)', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>All listings verified ✓</div>
-          ) : listings.map((l, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: i < listings.length - 1 ? '1px solid var(--border)' : 'none' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>{l.waste_type} — {l.quantity_kg} kg</div>
-                <div style={{ fontSize: 12, color: 'var(--text3)' }}>{l.seller?.full_name} · {new Date(l.created_at).toLocaleDateString()}</div>
-              </div>
-              <Button variant="primary" size="sm" onClick={() => handleVerify(l.id)}>Verify</Button>
+
+          {/* Auto-approved by CV */}
+<div className="card" style={{ marginTop: 16 }}>
+  <div className="section-hd">
+    <div className="section-title">Auto-Approved by AI ✓</div>
+  </div>
+  <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12 }}>
+    These listings passed CV verification automatically and are live on the marketplace.
+  </div>
+  {listings
+    .filter(l => l.status === 'active' && l.vision_verdict === 'verified')
+    .length === 0 ? (
+    <div style={{ color: 'var(--text3)', fontSize: 13, textAlign: 'center', padding: '16px 0' }}>
+      No auto-approved listings yet
+    </div>
+  ) : listings
+    .filter(l => l.status === 'active' && l.vision_verdict === 'verified')
+    .map((l, i, arr) => (
+      <div key={i} style={{
+        padding: '12px 0',
+        borderBottom: i < arr.length - 1 ? '1px solid var(--border)' : 'none',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 13 }}>
+              {l.waste_type} — {l.quantity_kg} kg
             </div>
-          ))}
+            <div style={{ fontSize: 12, color: 'var(--text3)' }}>
+              {l.seller?.full_name} · {new Date(l.created_at).toLocaleDateString()}
+            </div>
+          </div>
+          <span style={{
+            fontSize: 11, padding: '2px 8px', borderRadius: 12,
+            background: '#E8F5E9', color: '#2A6A2A', fontWeight: 600,
+          }}>
+            AI Verified ✓
+          </span>
+        </div>
+        {l.vision_confidence && (
+          <div style={{
+            background: '#f5f5f5', borderRadius: 6,
+            padding: '6px 10px', fontSize: 11,
+            display: 'flex', gap: 16,
+          }}>
+            <span>🎯 Confidence: <strong style={{ color: '#2A6A2A' }}>{l.vision_confidence}%</strong></span>
+            {l.vision_quality && <span>📸 Quality: <strong>{l.vision_quality}%</strong></span>}
+            {l.vision_consistency && <span>🔄 Consistency: <strong>{l.vision_consistency}%</strong></span>}
+          </div>
+        )}
+      </div>
+    ))
+  }
+</div>
+          {listings.length === 0 ? (
+  <div style={{ color: 'var(--text3)', fontSize: 13, textAlign: 'center', padding: '20px 0' }}>
+    All listings verified ✓
+  </div>
+) : listings.map((l, i) => (
+  <div key={i} style={{
+    padding: '12px 0',
+    borderBottom: i < listings.length - 1 ? '1px solid var(--border)' : 'none',
+  }}>
+    {/* Header row */}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontWeight: 600, fontSize: 13 }}>
+          {l.waste_type} — {l.quantity_kg} kg
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--text3)' }}>
+          {l.seller?.full_name} · {new Date(l.created_at).toLocaleDateString()}
+        </div>
+      </div>
+      {/* CV verdict badge */}
+      {l.vision_verdict && (
+        <span style={{
+          fontSize: 11,
+          padding: '2px 8px',
+          borderRadius: 12,
+          fontWeight: 600,
+          background: l.vision_verdict === 'verified'       ? '#E8F5E9'
+                    : l.vision_verdict === 'low_confidence' ? '#FFF8E1'
+                    : '#FFEBEE',
+          color:       l.vision_verdict === 'verified'       ? '#2A6A2A'
+                    : l.vision_verdict === 'low_confidence' ? '#7A5A00'
+                    : '#8A2020',
+        }}>
+          {l.vision_verdict === 'verified'       ? 'AI Verified'
+         : l.vision_verdict === 'low_confidence' ? 'Low Confidence'
+         : 'Flagged'}
+        </span>
+      )}
+      <Button variant="primary" size="sm" onClick={() => handleVerify(l.id)}>
+        Approve
+      </Button>
+    </div>
+
+    {/* CV scores — shown when available */}
+    {l.vision_confidence && (
+      <div style={{
+        background: '#f5f5f5',
+        borderRadius: 6,
+        padding: '8px 10px',
+        fontSize: 11,
+      }}>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+          <span>
+            🎯 Confidence:&nbsp;
+            <strong style={{ color: l.vision_confidence >= 85 ? '#2A6A2A' : '#C06010' }}>
+              {l.vision_confidence}%
+            </strong>
+          </span>
+          {l.vision_quality && (
+            <span>
+              📸 Quality:&nbsp;
+              <strong>{l.vision_quality}%</strong>
+            </span>
+          )}
+          {l.vision_consistency && (
+            <span>
+              🔄 Consistency:&nbsp;
+              <strong>{l.vision_consistency}%</strong>
+            </span>
+          )}
+        </div>
+        {l.vision_notes && (
+          <div style={{ marginTop: 4, color: '#666', fontStyle: 'italic' }}>
+            {l.vision_notes}
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+))}
         </div>
 
         {/* Recent users */}
@@ -138,4 +260,7 @@ export default function AdminDashboard({ user, onNavigate }) {
       </div>
     </div>
   );
+
+
+
 }

@@ -330,52 +330,41 @@ async function handleConfirmSubmit() {
 
   setError('');
   setLoading(true);
-  try {
-    // Step 1: Save CV vision results to the listing
-    await listingsService.update(createdListing.id, {
-      vision_confidence:  visionResult.confidence,
-      vision_quality:     visionResult.qualityScore,
-      vision_consistency: visionResult.consistencyScore,
-      vision_verdict:     visionResult.verdict,
-      vision_notes:       visionResult.notes,
-    });
 
-    // Step 2: Upload images
+  // Capture verdict BEFORE any async calls (clearVision would wipe it)
+  const verdict = visionResult.verdict;
+
+  try {
+    // Step 1: Upload images to storage (sets status → pending_verification)
     if (files.length > 0) {
       await listingsService.uploadImages(createdListing.id, files);
     }
 
-    // Step 3: Submit
-    try {
-      await listingsService.submit(createdListing.id);
-    } catch (submitErr) {
-      // Check if listing actually submitted despite the error
-      // by fetching the current status from the backend
-      const freshListing = await listingsService.getById(createdListing.id);
-      console.log('Listing status after submit attempt:', freshListing.status);
+    // Step 2: Route based on CV verdict
+    if (verdict === 'verified') {
+      // Auto-approve — sets status → 'verified' with CV scores written
+      await listingsService.autoApprove(createdListing.id, visionResult);
+      console.log('✅ Listing auto-approved by CV module');
 
-      // If it reached pending_verification or similar — it succeeded
-      const successStatuses = [
-        'pending_verification',
-        'pending',
-        'submitted',
-        'under_review',
-        'active',
-      ];
-      if (successStatuses.includes(freshListing.status)) {
-        // Submission succeeded despite the error response
-        console.log('✅ Listing submitted successfully:', freshListing.status);
-        clearVision();
-        setStep(4);
-        return;
-      }
+    } else if (verdict === 'low_confidence') {
+      await listingsService.requestMoreImages(createdListing.id, visionResult);
+      console.log('⚠️ Listing pending — low confidence, more images needed');
 
-      // Genuinely failed — show the error
-      throw submitErr;
+    } else {
+      // Rejected — save CV results for admin review
+      await listingsService.update(createdListing.id, {
+        vision_confidence:  visionResult.confidence,
+        vision_quality:     visionResult.qualityScore,
+        vision_consistency: visionResult.consistencyScore,
+        vision_verdict:     visionResult.verdict,
+        vision_notes:       visionResult.notes,
+      });
+      console.log('❌ Listing flagged for manual review');
     }
 
-    clearVision();
+    // ✅ DO NOT call clearVision() here — renderDoneStep reads visionResult
     setStep(4);
+
   } catch (e) {
     console.error('❌ Submit failed:', e);
     setError(e.message || 'Submission failed. Please try again.');
@@ -385,13 +374,14 @@ async function handleConfirmSubmit() {
 }
 
   function reset() {
-    setStep(1); setWasteType(''); setSubtype(''); setQty('');
-    setCondition('clean'); setCollectionPoint('commercial'); setCounty('Nairobi');
-    ; setNotes(''); setSelectedPricePerKg(null); 
-    setManualPricePerKg(''); setPriceSource('ai'); setAiPricing(null);
-    setLocation(''); setLat(null); setLng(null);
-    setFiles([]); setPreviews([]); setCreatedListing(null); setError('');
-  }
+  setStep(1); setWasteType(''); setSubtype(''); setQty('');
+  setCondition('clean'); setCollectionPoint('commercial'); setCounty('Nairobi');
+  setNotes(''); setSelectedPricePerKg(null); 
+  setManualPricePerKg(''); setPriceSource('ai'); setAiPricing(null);
+  setLocation(''); setLat(null); setLng(null);
+  setFiles([]); setPreviews([]); setCreatedListing(null); setError('');
+  clearVision(); // ✅ moved here from handleConfirmSubmit
+}
 
   const formatKES = (amount) => `KES ${Math.round(amount).toLocaleString()}`;
 
@@ -960,21 +950,72 @@ async function handleConfirmSubmit() {
 };
 
   // Step 4: Done
-  const renderDoneStep = () => (
+  const renderDoneStep = () => {
+  const wasAutoApproved = visionResult?.verdict === 'verified';
+
+  return (
     <div className="card" style={{ textAlign: 'center', padding: '40px 24px' }}>
-      <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#E0F0E0', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-        <Icon name="check" size={32} color="#2A6A2A" strokeWidth={2.5} />
+      <div style={{
+        width: 64, height: 64, borderRadius: '50%',
+        background: wasAutoApproved ? '#E0F0E0' : '#FFF8E1',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        margin: '0 auto 16px',
+      }}>
+        <Icon
+          name="check"
+          size={32}
+          color={wasAutoApproved ? '#2A6A2A' : '#7A5A00'}
+          strokeWidth={2.5}
+        />
       </div>
-      <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Listing Submitted!</div>
-      <div style={{ color: '#666', fontSize: 14, marginBottom: 24 }}>
-        Your listing is pending verification. We'll notify you once it's approved.
+
+      <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>
+        {wasAutoApproved ? 'Listing Auto-Approved! ✓' : 'Listing Submitted!'}
       </div>
+
+      <div style={{ color: '#666', fontSize: 14, marginBottom: 16 }}>
+        {wasAutoApproved
+          ? 'Your listing passed AI verification and is now live on the marketplace.'
+          : visionResult?.verdict === 'low_confidence'
+            ? 'Your listing has been submitted for administrator review. You may be asked to provide additional images.'
+            : 'Your listing has been flagged for manual review. An administrator will verify it shortly.'}
+      </div>
+
+      {/* Show CV score summary */}
+      {visionResult && (
+        <div style={{
+          background: wasAutoApproved ? '#E8F5E9' : '#FFF8E1',
+          border: `1px solid ${wasAutoApproved ? '#2A6A2A' : '#7A5A00'}`,
+          borderRadius: 8,
+          padding: '12px 16px',
+          marginBottom: 20,
+          textAlign: 'left',
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 8 }}>
+            CV Verification Summary
+          </div>
+          {[
+            { label: 'Detection Confidence', value: visionResult.confidence },
+            { label: 'Quality Score',         value: visionResult.qualityScore },
+            { label: 'Batch Consistency',     value: visionResult.consistencyScore },
+          ].map(({ label, value }) => (
+            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+              <span style={{ color: '#666' }}>{label}</span>
+              <span style={{ fontWeight: 600, color: value >= 85 ? '#2A6A2A' : '#7A5A00' }}>
+                {value}%
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
         <Button variant="primary" onClick={reset}>List Another</Button>
         <Button variant="secondary" onClick={() => onNavigate('dashboard')}>Dashboard</Button>
       </div>
     </div>
   );
+};
 
   return (
     <div className="page">
