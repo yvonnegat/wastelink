@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { authService } from '../services/authService';
+import { usersService } from '../services/userService'; // ADD THIS
 import { tokenStore } from '../services/apiClient';
 
 const AuthContext = createContext(null);
@@ -10,23 +11,35 @@ export function AuthProvider({ children }) {
   const [error, setError]     = useState(null);
   const bootstrapped = useRef(false);
 
-  // On mount — try to restore session from stored tokens
   useEffect(() => {
     if (bootstrapped.current) return;
     bootstrapped.current = true;
 
     const token = tokenStore.getAccess();
-    if (!token) { setLoading(false); return; }
+    if (!token) {
+      const cached = localStorage.getItem('wastelink_user_profile');
+      if (cached) {
+        try { setUser(JSON.parse(cached)); } catch { /* ignore */ }
+      }
+      setLoading(false);
+      return;
+    }
 
-    authService.me()
-      .then(u => setUser(u))
-      .catch(() => tokenStore.clearTokens())
+    // USE usersService.getMe() — returns user + map_locations + recycler_profiles
+    usersService.getMe()
+      .then(u => {
+        setUser(u);
+        localStorage.setItem('wastelink_user_profile', JSON.stringify(u));
+      })
+      .catch(() => {
+        tokenStore.clearTokens();
+        localStorage.removeItem('wastelink_user_profile');
+      })
       .finally(() => setLoading(false));
   }, []);
 
-  // Listen for forced logout events (e.g. 401 with no refresh)
   useEffect(() => {
-    const handler = () => { setUser(null); };
+    const handler = () => setUser(null);
     window.addEventListener('wl:logout', handler);
     return () => window.removeEventListener('wl:logout', handler);
   }, []);
@@ -34,37 +47,40 @@ export function AuthProvider({ children }) {
   const login = useCallback(async ({ email, password }) => {
     setError(null);
     const u = await authService.login({ email, password });
-    setUser(u);
-    return u;
+    // After login, fetch full user with locations
+    const fullUser = await usersService.getMe();
+    setUser(fullUser);
+    localStorage.setItem('wastelink_user_profile', JSON.stringify(fullUser));
+    return fullUser;
   }, []);
 
- const register = useCallback(async (payload) => {
-  setError(null);
-  const u = await authService.register(payload);
-  setUser(u);
-  return u;
-}, []);
+  const register = useCallback(async (payload) => {
+    setError(null);
+    await authService.register(payload);
+    // After register, fetch full user with locations
+    const fullUser = await usersService.getMe();
+    setUser(fullUser);
+    localStorage.setItem('wastelink_user_profile', JSON.stringify(fullUser));
+    return fullUser;
+  }, []);
 
   const logout = useCallback(async () => {
-  try {
-    await authService.logout();
-  } catch (e) {
-    console.warn('logout failed');
-  } finally {
-    setUser(null);
-    localStorage.removeItem('wastelink_user_profile');
-  }
-}, []);
-
-  const updateUser = useCallback((updates) => {
-    setUser(prev => prev ? { ...prev, ...updates } : prev);
+    try { await authService.logout(); } catch { console.warn('logout failed'); }
+    finally {
+      setUser(null);
+      localStorage.removeItem('wastelink_user_profile');
+    }
   }, []);
 
-  const cached = localStorage.getItem('wastelink_user_profile');
+  const updateUser = useCallback((updates) => {
+    setUser(prev => {
+      if (!prev) return prev;
+      const next = { ...prev, ...updates };
+      localStorage.setItem('wastelink_user_profile', JSON.stringify(next));
+      return next;
+    });
+  }, []);
 
-    if (cached && !user?.map_locations) {
-      setUser(JSON.parse(cached));
-    }
   return (
     <AuthContext.Provider value={{ user, loading, error, setError, login, register, logout, updateUser }}>
       {children}

@@ -3,12 +3,15 @@ import { WASTE_TYPES } from '../../data/mockData';
 import { Button, StepIndicator, Alert } from '../common';
 import Icon from '../common/Icon';
 import { listingsService } from '../../services/ListingService';
+import { useVision } from '../../hooks/useVision';
 import { getPrice } from '../../services/pricingService';
 import {
   Recycle, Newspaper, Cog, Wine, Sprout, MonitorSmartphone, Scissors, Disc3
 } from 'lucide-react';
 
-const STEPS = ['Details', 'Price', 'Upload', 'Done'];
+
+
+const STEPS = ['Details', 'Price', 'Verify', 'Done'];
 
 const CONDITIONS = [
   { label: 'Clean / Sorted', value: 'clean' },
@@ -198,7 +201,6 @@ export default function WasteListing({ onNavigate }) {
   const [condition, setCondition] = useState('clean');
   const [collectionPoint, setCollectionPoint] = useState('commercial');
   const [county, setCounty] = useState('Nairobi');
-  const [distanceKm, setDistanceKm] = useState(5);
   const [notes, setNotes] = useState('');
 
   const [location, setLocation] = useState('');
@@ -220,9 +222,8 @@ export default function WasteListing({ onNavigate }) {
   const [previews, setPreviews] = useState([]);
   const [drag, setDrag] = useState(false);
   const [loading, setLoading] = useState(false);
-
-  // Inline field errors
-  const [fieldErrors, setFieldErrors] = useState({});
+  const [error, setError] = useState('');
+  const fileRef = useRef();
 
   const selectedType = wasteTypeArray.find(w => w.label === wasteType);
   const quantityNum = parseFloat(qty) || 0;
@@ -321,8 +322,9 @@ export default function WasteListing({ onNavigate }) {
         setPricingLoading(false);
       }
     };
-    const t = setTimeout(fetchAiPrice, 500);
-    return () => clearTimeout(t);
+    
+    const timeout = setTimeout(fetchAiPrice, 500);
+    return () => clearTimeout(timeout);
   }, [wasteType, subtype, qty, condition, county, collectionPoint]);
 
   // ── File handling ─────────────────────────────────────────────────────
@@ -419,17 +421,28 @@ export default function WasteListing({ onNavigate }) {
 
   async function handleUploadImages() {
     if (!createdListing) {
-      addToast({ type: 'error', title: 'Listing Not Found', message: 'Please go back and recreate your listing.' });
+      setError('Listing not found. Please go back and recreate.');
       return;
     }
+    
+    setError('');
     setLoading(true);
     try {
-      if (files.length > 0) await listingsService.uploadImages(createdListing.id, files);
-      else await listingsService.submit(createdListing.id);
-      addToast({ type: 'success', title: 'Listing Submitted!', message: 'Your listing is pending verification.', duration: 5000 });
+      if (files.length > 0) {
+        console.log('📸 Uploading images...', files.length);
+        await listingsService.uploadImages(createdListing.id, files);
+        console.log('✅ Images uploaded');
+      }
+      
+      if (files.length === 0) {
+        console.log('📤 No images, submitting listing...');
+        await listingsService.submit(createdListing.id);
+      }
+      
       setStep(4);
     } catch (e) {
-      addToast({ type: 'warning', title: 'Upload Issue', message: 'Images could not upload, but your listing was saved.' });
+      console.error('❌ Upload failed:', e);
+      setError(e.message || 'Upload failed. Your listing was saved — you can skip images.');
       setStep(4);
     } finally {
       setLoading(false);
@@ -439,7 +452,7 @@ export default function WasteListing({ onNavigate }) {
   function reset() {
     setStep(1); setWasteType(''); setSubtype(''); setQty('');
     setCondition('clean'); setCollectionPoint('commercial'); setCounty('Nairobi');
-    setDistanceKm(5); setNotes(''); setSelectedPricePerKg(null);
+    setDistanceKm(5); setNotes(''); setSelectedPricePerKg(null); 
     setManualPricePerKg(''); setPriceSource('ai'); setAiPricing(null);
     setLocation(''); setLat(null); setLng(null);
     setFiles([]); setPreviews([]); setCreatedListing(null); setFieldErrors({});
@@ -768,10 +781,13 @@ export default function WasteListing({ onNavigate }) {
     </div>
   );
 
+  // Step 3: Upload
   const renderUploadStep = () => (
     <div className="card">
       <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Step 3 — Upload Photos</div>
-      <div style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>Upload up to 5 photos. Clear images improve matching speed.</div>
+      <div style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>
+        Upload up to 5 photos. Clear images improve matching speed.
+      </div>
 
       <div
         onDragOver={e => { e.preventDefault(); setDrag(true); }}
@@ -779,14 +795,18 @@ export default function WasteListing({ onNavigate }) {
         onDrop={handleDrop}
         onClick={() => fileRef.current?.click()}
         style={{
-          border: `2px dashed ${drag ? '#2A6A2A' : '#ddd'}`, borderRadius: '8px',
-          padding: '32px 20px', textAlign: 'center', cursor: 'pointer', marginBottom: 16,
-          background: drag ? '#f0f5ec' : '#fafaf8', transition: 'border-color 0.15s, background 0.15s',
+          border: `2px dashed ${drag ? '#2A6A2A' : '#ddd'}`,
+          borderRadius: '8px', padding: '32px 20px',
+          textAlign: 'center', cursor: 'pointer', marginBottom: 16,
+          background: drag ? '#f0f5ec' : '#fafaf8',
         }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}><Icons.Camera /></div>
+        <Icon name="camera" size={32} color="#2A6A2A" style={{ marginBottom: 8 }} />
         <div style={{ fontWeight: 600, fontSize: 14 }}>Drop images here or click to browse</div>
-        <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>PNG, JPG up to 10 MB each · Max 5 images</div>
-        <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => handleFile(e.target.files)} />
+        <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+          PNG, JPG up to 10 MB each · Max 5 images
+        </div>
+        <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
+          onChange={e => handleFile(e.target.files)} />
       </div>
 
       {previews.length > 0 && (
@@ -794,9 +814,8 @@ export default function WasteListing({ onNavigate }) {
           {previews.map((src, i) => (
             <div key={i} style={{ position: 'relative', width: 80, height: 80 }}>
               <img src={src} alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8 }} />
-              <button onClick={() => removeFile(i)} style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: '#E05050', border: 'none', color: '#fff', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Icons.X />
-              </button>
+              <button onClick={() => removeFile(i)}
+                style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: '#E05050', border: 'none', color: '#fff', fontSize: 12, cursor: 'pointer' }}>×</button>
             </div>
           ))}
         </div>
@@ -807,9 +826,37 @@ export default function WasteListing({ onNavigate }) {
         <Button variant="primary" loading={loading} onClick={handleUploadImages}>
           {files.length > 0 ? 'Upload & Submit' : 'Skip & Submit'}
         </Button>
+ 
+        {/* Run verification — shown when images uploaded but not yet verified */}
+        {!visionResult && !visionLoading && (
+          <Button
+            variant="primary"
+            loading={visionLoading}
+            disabled={files.length === 0 || visionLoading}
+            onClick={handleUploadImages}
+          >
+            {files.length === 0
+              ? 'Upload images to verify'
+              : `Verify ${files.length} Image${files.length > 1 ? 's' : ''} with AI`}
+          </Button>
+        )}
+ 
+        {/* Submit — only shown after successful verification */}
+        {visionResult && !visionLoading && (
+          <Button
+            variant="primary"
+            loading={loading}
+            onClick={handleConfirmSubmit}
+          >
+            {visionResult.verdict === 'verified'
+              ? 'Confirm & Submit Listing →'
+              : 'Submit for Manual Review →'}
+          </Button>
+        )}
       </div>
     </div>
   );
+};
 
   const renderDoneStep = () => (
     <div className="card" style={{ textAlign: 'center', padding: '40px 24px' }}>
@@ -849,4 +896,3 @@ export default function WasteListing({ onNavigate }) {
       </div>
     </>
   );
-}
