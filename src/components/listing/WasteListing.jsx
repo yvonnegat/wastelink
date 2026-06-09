@@ -1,14 +1,14 @@
-import React, { useState, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { WASTE_TYPES } from '../../data/mockData';
 import { Button, StepIndicator, Alert } from '../common';
 import Icon from '../common/Icon';
 import { listingsService } from '../../services/ListingService';
-import { useVision } from '../../hooks/useVision';
 import { getPrice } from '../../services/pricingService';
+import {
+  Recycle, Newspaper, Cog, Wine, Sprout, MonitorSmartphone, Scissors, Disc3
+} from 'lucide-react';
 
-
-
-const STEPS = ['Details', 'Price', 'Verify', 'Done'];
+const STEPS = ['Details', 'Price', 'Upload', 'Done'];
 
 const CONDITIONS = [
   { label: 'Clean / Sorted', value: 'clean' },
@@ -18,41 +18,24 @@ const CONDITIONS = [
 ];
 
 const COLLECTION_POINTS = [
-  { value: 'commercial', label: '🏢 Commercial', desc: 'Business waste, regular pickup' },
-  { value: 'industrial', label: '🏭 Industrial', desc: 'Factory/manufacturing waste, bulk volume' },
-  { value: 'household', label: '🏠 Household', desc: 'Residential, small quantities' },
+  { value: 'commercial', label: 'Commercial', desc: 'Business waste, regular pickup' },
+  { value: 'industrial', label: 'Industrial', desc: 'Factory/manufacturing waste, bulk volume' },
+  { value: 'household', label: 'Household', desc: 'Residential, small quantities' },
 ];
 
 const COUNTIES = [
-  'Nairobi', 'Mombasa', 'Kisumu', 'Kiambu', 'Nakuru', 'Eldoret', 
+  'Nairobi', 'Mombasa', 'Kisumu', 'Kiambu', 'Nakuru', 'Eldoret',
   'Machakos', 'Kajiado', 'Tharaka Nithi', 'Meru', 'Nyeri', 'Kirinyaga'
 ];
 
 const SUBTYPE_MAP = {
-  'PET Bottles': 'PET',
-  'HDPE': 'HDPE',
-  'PVC': 'PVC',
-  'LDPE': 'LDPE',
-  'PP': 'PP',
-  'PS': 'PS',
-  'Cardboard': 'cardboard',
-  'Newspaper': 'newspaper',
-  'Office Paper': 'office_paper',
-  'Magazines': 'magazines',
-  'Aluminium Cans': 'aluminium',
-  'Iron Scrap': 'iron',
-  'Copper Wire': 'copper',
-  'Steel': 'steel',
-  'Clear Glass': 'clear_glass',
-  'Brown Glass': 'brown_glass',
-  'Green Glass': 'green_glass',
-  'Food Waste': 'food_waste',
-  'Garden Waste': 'garden_waste',
-  'Wood': 'wood',
-  'Phones': 'phones',
-  'Computers': 'computers',
-  'Batteries': 'batteries',
-  'Cables': 'cables',
+  'PET Bottles': 'PET', 'HDPE': 'HDPE', 'PVC': 'PVC', 'LDPE': 'LDPE',
+  'PP': 'PP', 'PS': 'PS', 'Cardboard': 'cardboard', 'Newspaper': 'newspaper',
+  'Office Paper': 'office_paper', 'Magazines': 'magazines', 'Aluminium Cans': 'aluminium',
+  'Iron Scrap': 'iron', 'Copper Wire': 'copper', 'Steel': 'steel',
+  'Clear Glass': 'clear_glass', 'Brown Glass': 'brown_glass', 'Green Glass': 'green_glass',
+  'Food Waste': 'food_waste', 'Garden Waste': 'garden_waste', 'Wood': 'wood',
+  'Phones': 'phones', 'Computers': 'computers', 'Batteries': 'batteries', 'Cables': 'cables',
 };
 
 function buildWasteTypeArray(wasteTypesData) {
@@ -66,15 +49,148 @@ function buildWasteTypeArray(wasteTypesData) {
   return [];
 }
 
-const EMOJI_MAP = {
-  Plastic: '🧴', Paper: '📄', Metal: '⚙️', Glass: '🫙',
-  Organic: '🌿', 'E-Waste': '📱', Textile: '👕', Rubber: '🔧',
+// ─── SVG Icon Components ───────────────────────────────────────────────────────
+const SvgIcon = ({ d, size = 20, color = 'currentColor', strokeWidth = 1.75, viewBox = '0 0 24 24', style = {} }) => (
+  <svg
+    width={size} height={size} viewBox={viewBox} fill="none"
+    stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round"
+    style={{ flexShrink: 0, ...style }}
+  >
+    {Array.isArray(d) ? d.map((path, i) => <path key={i} d={path} />) : <path d={d} />}
+  </svg>
+);
+
+const Icons = {
+  // UI icons only — waste type icons use Lucide (imported above)
+  MapPin:     () => <SvgIcon size={16} d={["M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z","M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0-6 0"]} />,
+  Crosshair:  () => <SvgIcon size={16} d={["M12 2v4","M12 18v4","M2 12h4","M18 12h4","M12 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0-6 0"]} />,
+  ChevronRight: () => <SvgIcon size={16} d="M9 18l6-6-6-6" />,
+  ChevronLeft:  () => <SvgIcon size={16} d="M15 18l-6-6 6-6" />,
+  CheckCircle:  () => <SvgIcon size={20} d={["M22 11.08V12a10 10 0 1 1-5.93-9.14","M22 4L12 14.01l-3-3"]} color="#22a855" />,
+  XCircle:      () => <SvgIcon size={20} d={["M22 12A10 10 0 1 1 2 12a10 10 0 0 1 20 0","M15 9l-6 6","M9 9l6 6"]} color="#e05050" />,
+  AlertTriangle: () => <SvgIcon size={20} d={["M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z","M12 9v4","M12 17h.01"]} color="#f59e0b" />,
+  Info:         () => <SvgIcon size={20} d={["M12 22A10 10 0 1 0 12 2a10 10 0 0 0 0 20z","M12 16v-4","M12 8h.01"]} color="#3b82f6" />,
+  X:            () => <SvgIcon size={14} d="M18 6L6 18M6 6l12 12" strokeWidth={2.5} />,
+  Camera:       () => <SvgIcon size={28} d={["M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z","M12 17A4 4 0 1 0 12 9a4 4 0 0 0 0 8z"]} color="#2A6A2A" />,
+  Building2:    () => <SvgIcon size={18} d={["M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18z","M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2","M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2","M10 6h4","M10 10h4","M10 14h4","M10 18h4"]} />,
+  Factory:      () => <SvgIcon size={18} d={["M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v16z","M17 18h1","M12 18h1","M7 18h1"]} />,
+  Home:         () => <SvgIcon size={18} d={["M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z","M9 22V12h6v10"]} />,
+  TrendingUp:   () => <SvgIcon size={16} d="M23 6l-9.5 9.5-5-5L1 18" />,
+  Loader:       () => <SvgIcon size={16} d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />,
+  Sparkles:     () => <SvgIcon size={14} d={["M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z","M5 17l.75 2.25L8 20l-2.25.75L5 23l-.75-2.25L2 20l2.25-.75L5 17z"]} />,
 };
 
+const CollectionIcons = { commercial: Icons.Building2, industrial: Icons.Factory, household: Icons.Home };
+
+const WASTE_TILE_CONFIG = {
+  Plastic:   { LucideIcon: Recycle,           color: '#0ea5e9', bg: '#f0f9ff', border: '#bae6fd', selectedBg: '#e0f2fe', selectedBorder: '#0ea5e9' },
+  Paper:     { LucideIcon: Newspaper,          color: '#f59e0b', bg: '#fffbeb', border: '#fde68a', selectedBg: '#fef3c7', selectedBorder: '#f59e0b' },
+  Metal:     { LucideIcon: Cog,                color: '#6b7280', bg: '#f9fafb', border: '#d1d5db', selectedBg: '#f3f4f6', selectedBorder: '#6b7280' },
+  Glass:     { LucideIcon: Wine,               color: '#14b8a6', bg: '#f0fdfa', border: '#99f6e4', selectedBg: '#ccfbf1', selectedBorder: '#14b8a6' },
+  Organic:   { LucideIcon: Sprout,             color: '#22c55e', bg: '#f0fdf4', border: '#bbf7d0', selectedBg: '#dcfce7', selectedBorder: '#22c55e' },
+  'E-Waste': { LucideIcon: MonitorSmartphone,  color: '#8b5cf6', bg: '#faf5ff', border: '#ddd6fe', selectedBg: '#ede9fe', selectedBorder: '#8b5cf6' },
+  Textile:   { LucideIcon: Scissors,           color: '#ec4899', bg: '#fdf2f8', border: '#fbcfe8', selectedBg: '#fce7f3', selectedBorder: '#ec4899' },
+  Rubber:    { LucideIcon: Disc3,              color: '#374151', bg: '#f9fafb', border: '#e5e7eb', selectedBg: '#f3f4f6', selectedBorder: '#374151' },
+};
+
+// ─── Toast Notification System ────────────────────────────────────────────────
+let toastId = 0;
+const toastListeners = [];
+const addToast = (toast) => { toastListeners.forEach(fn => fn({ id: ++toastId, ...toast })); };
+
+function ToastContainer() {
+  const [toasts, setToasts] = useState([]);
+
+  useEffect(() => {
+    const handler = (toast) => {
+      setToasts(prev => [...prev, toast]);
+      setTimeout(() => {
+        setToasts(prev => prev.filter(t => t.id !== toast.id));
+      }, toast.duration || 4000);
+    };
+    toastListeners.push(handler);
+    return () => { const i = toastListeners.indexOf(handler); if (i > -1) toastListeners.splice(i, 1); };
+  }, []);
+
+  const dismiss = (id) => setToasts(prev => prev.filter(t => t.id !== id));
+
+  const typeStyles = {
+    success: { bg: '#f0fdf4', border: '#86efac', icon: <Icons.CheckCircle />, titleColor: '#15803d' },
+    error:   { bg: '#fef2f2', border: '#fca5a5', icon: <Icons.XCircle />,     titleColor: '#b91c1c' },
+    warning: { bg: '#fffbeb', border: '#fcd34d', icon: <Icons.AlertTriangle />, titleColor: '#92400e' },
+    info:    { bg: '#eff6ff', border: '#93c5fd', icon: <Icons.Info />,         titleColor: '#1e40af' },
+  };
+
+  return (
+    <div style={{
+      position: 'fixed', bottom: 24, right: 24, zIndex: 10000,
+      display: 'flex', flexDirection: 'column', gap: 10,
+      maxWidth: 360, width: 'calc(100vw - 48px)',
+      pointerEvents: 'none',
+    }}>
+      {toasts.map((toast) => {
+        const s = typeStyles[toast.type] || typeStyles.info;
+        return (
+          <div key={toast.id} style={{
+            background: s.bg,
+            border: `1px solid ${s.border}`,
+            borderRadius: 12,
+            padding: '14px 16px',
+            display: 'flex', alignItems: 'flex-start', gap: 12,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08)',
+            pointerEvents: 'all',
+            animation: 'toastIn 0.28s cubic-bezier(0.34, 1.56, 0.64, 1)',
+          }}>
+            <span style={{ flexShrink: 0, marginTop: 1 }}>{s.icon}</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              {toast.title && (
+                <div style={{ fontWeight: 600, fontSize: 13.5, color: s.titleColor, marginBottom: toast.message ? 3 : 0 }}>
+                  {toast.title}
+                </div>
+              )}
+              {toast.message && (
+                <div style={{ fontSize: 13, color: '#444', lineHeight: 1.4 }}>{toast.message}</div>
+              )}
+            </div>
+            <button
+              onClick={() => dismiss(toast.id)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#888', flexShrink: 0, marginTop: 1 }}
+            >
+              <Icons.X />
+            </button>
+          </div>
+        );
+      })}
+      <style>{`
+        @keyframes toastIn {
+          from { opacity: 0; transform: translateX(20px) scale(0.95); }
+          to   { opacity: 1; transform: translateX(0) scale(1); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ─── Inline Field Error ───────────────────────────────────────────────────────
+function FieldError({ message }) {
+  if (!message) return null;
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 5,
+      color: '#b91c1c', fontSize: 12, marginTop: 5, fontWeight: 500,
+      animation: 'fadeIn 0.15s ease',
+    }}>
+      <SvgIcon size={12} d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01" color="#b91c1c" strokeWidth={2} />
+      {message}
+      <style>{`@keyframes fadeIn { from { opacity:0; transform: translateY(-4px);} to { opacity:1; transform:translateY(0);} }`}</style>
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export default function WasteListing({ onNavigate }) {
   const wasteTypeArray = useMemo(() => buildWasteTypeArray(WASTE_TYPES), []);
 
-  // Step 1 state
   const [step, setStep] = useState(1);
   const [wasteType, setWasteType] = useState('');
   const [subtype, setSubtype] = useState('');
@@ -82,47 +198,38 @@ export default function WasteListing({ onNavigate }) {
   const [condition, setCondition] = useState('clean');
   const [collectionPoint, setCollectionPoint] = useState('commercial');
   const [county, setCounty] = useState('Nairobi');
+  const [distanceKm, setDistanceKm] = useState(5);
   const [notes, setNotes] = useState('');
-  
-  // Location state
+
   const [location, setLocation] = useState('');
   const [lat, setLat] = useState(null);
   const [lng, setLng] = useState(null);
   const [isLocating, setIsLocating] = useState(false);
-  
-  // AI Pricing state
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+
   const [aiPricing, setAiPricing] = useState(null);
   const [pricingLoading, setPricingLoading] = useState(false);
   const [selectedPricePerKg, setSelectedPricePerKg] = useState(null);
   const [priceSource, setPriceSource] = useState('ai');
   const [manualPricePerKg, setManualPricePerKg] = useState('');
-  
-  // Listing state
+
   const [createdListing, setCreatedListing] = useState(null);
   const [files, setFiles] = useState([]);
   const [previews, setPreviews] = useState([]);
   const [drag, setDrag] = useState(false);
   const [loading, setLoading] = useState(false);
-  const {
-  result: visionResult,
-  loading: visionLoading,
-  error: visionError,
-  analyse,
-  clear: clearVision,
-} = useVision();
-  const [error, setError] = useState('');
-  const [fieldErrors, setFieldErrors] = useState({});
-  const [distanceKm, setDistanceKm] = useState(5);
-  const fileRef = useRef();
 
- 
+  // Inline field errors
+  const [fieldErrors, setFieldErrors] = useState({});
+
   const selectedType = wasteTypeArray.find(w => w.label === wasteType);
   const quantityNum = parseFloat(qty) || 0;
 
-  
-
   const GEOAPIFY_KEY = process.env?.REACT_APP_GEOAPIFY_KEY;
-  
+  const fileRef = useRef();
+
   // ── Validation helpers ────────────────────────────────────────────────
   const setFieldError = (field, msg) =>
     setFieldErrors(prev => msg ? { ...prev, [field]: msg } : (() => { const e = { ...prev }; delete e[field]; return e; })());
@@ -141,9 +248,7 @@ export default function WasteListing({ onNavigate }) {
     if (!loc && !lat) return 'Pickup location is required';
     return null;
   };
-  // Add these two lines:
-const [suggestions, setSuggestions] = useState([]);
-const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+
   // ── Suggestions ───────────────────────────────────────────────────────
   const fetchSuggestions = async (text) => {
     if (!text || text.length < 3) { setSuggestions([]); return; }
@@ -169,62 +274,46 @@ const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const getCurrentLocation = () => {
     setIsLocating(true);
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser');
+      addToast({ type: 'error', title: 'Not Supported', message: 'Geolocation is not supported by your browser.' });
       setIsLocating(false);
       return;
     }
-    
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
-        setLat(latitude);
-        setLng(longitude);
-        
-        // Reverse geocode to get address
+        setLat(latitude); setLng(longitude);
         try {
           const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
           const data = await response.json();
-          if (data && data.display_name) {
-            setLocation(data.display_name);
-          } else {
-            setLocation(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
-          }
-        } catch (error) {
-          console.error('Reverse geocoding error:', error);
+          const addr = data?.display_name || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+          setLocation(addr);
+          clearFieldError('location');
+          addToast({ type: 'success', title: 'Location Found', message: 'Your current location has been set.' });
+        } catch {
           setLocation(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+          addToast({ type: 'info', title: 'Location Set', message: 'Coordinates saved. Address lookup failed.' });
+        } finally {
+          setIsLocating(false);
         }
-        setIsLocating(false);
       },
-      (error) => {
-        console.error('Geolocation error:', error);
-        alert('Unable to get your location. Please enter manually.');
+      (err) => {
+        console.error('Geolocation error:', err);
+        addToast({ type: 'error', title: 'Location Denied', message: 'Unable to get your location. Please enter it manually.' });
         setIsLocating(false);
       }
     );
   };
 
-  // Fetch AI price when inputs change
+  // ── AI Pricing ───────────────────────────────────────────────────────
   useEffect(() => {
     const fetchAiPrice = async () => {
       if (!wasteType || !qty || quantityNum <= 0) return;
-      
       setPricingLoading(true);
       try {
-        const result = await getPrice({
-          wasteType,
-          subtype,
-          quantity: quantityNum,
-          condition,
-          county,
-          collectionPoint,
-        });
-        
+        const result = await getPrice({ wasteType, subtype, quantity: quantityNum, condition, county, collectionPoint });
         setAiPricing(result);
-        const recommendedPerKg = result.perKgRange?.recommended || result.priceRange?.recommended;
-        
-        if (priceSource === 'ai' && !selectedPricePerKg) {
-          setSelectedPricePerKg(recommendedPerKg);
-        }
+        const recommended = result.perKgRange?.recommended || result.priceRange?.recommended;
+        if (priceSource === 'ai' && !selectedPricePerKg) setSelectedPricePerKg(recommended);
       } catch (err) {
         console.error('AI pricing failed:', err);
         setAiPricing(null);
@@ -232,12 +321,11 @@ const [loadingSuggestions, setLoadingSuggestions] = useState(false);
         setPricingLoading(false);
       }
     };
-    
-    const timeout = setTimeout(fetchAiPrice, 500);
-    return () => clearTimeout(timeout);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    const t = setTimeout(fetchAiPrice, 500);
+    return () => clearTimeout(t);
   }, [wasteType, subtype, qty, condition, county, collectionPoint]);
 
+  // ── File handling ─────────────────────────────────────────────────────
   function handleFile(newFiles) {
     const valid = Array.from(newFiles).filter(f => f.type.startsWith('image/'));
     setFiles(prev => [...prev, ...valid].slice(0, 5));
@@ -248,128 +336,100 @@ const [loadingSuggestions, setLoadingSuggestions] = useState(false);
     });
   }
 
-  function handleDrop(e) {
-    e.preventDefault();
-    setDrag(false);
-    handleFile(e.dataTransfer.files);
-  }
-
+  function handleDrop(e) { e.preventDefault(); setDrag(false); handleFile(e.dataTransfer.files); }
   function removeFile(i) {
     setFiles(prev => prev.filter((_, idx) => idx !== i));
     setPreviews(prev => prev.filter((_, idx) => idx !== i));
   }
 
-  // STEP 1: Create listing with all details including location
-  // STEP 1: Create listing with all details including location
-async function handleCreateListing() {
-  if (!wasteType) { setError('Please select a waste type'); return; }
-  if (!qty || quantityNum <= 0) { setError('Please enter a valid quantity'); return; }
-  if (!location && !lat) { setError('Please enter your pickup location'); return; }
-  
-  const mappedSubtype = subtype ? (SUBTYPE_MAP[subtype] || subtype) : 'Mixed';
-  
-  setError('');
-  setLoading(true);
-  
-  try {
-    const listingPayload = {
-      waste_type: wasteType,
-      subtype: mappedSubtype,
-      quantity_kg: quantityNum,
-      condition: condition,
-      collection_point: collectionPoint,  // ✅ ADD THIS - it was missing!
-      county: county,
-      location: location || `${county}, Kenya`,
-      // Only include lat/lng if they have values
-      ...(lat && { lat: lat }),
-      ...(lng && { lng: lng }),
-    };
-    
-    console.log('📦 Creating listing with payload:', listingPayload);
-    const listing = await listingsService.create(listingPayload);
-    console.log('✅ Listing created:', listing);
-    
-    setCreatedListing(listing);
-    setStep(2);
-  } catch (e) {
-    console.error('❌ Failed to create listing:', e);
-    setError(e.message || 'Failed to create listing. Please try again.');
-  } finally {
-    setLoading(false);
-  }
-}
+  // ── Step handlers ─────────────────────────────────────────────────────
+  async function handleCreateListing() {
+    const errors = {};
+    if (!wasteType) errors.wasteType = 'Please select a waste type';
+    const qtyErr = validateQty(qty);
+    if (qtyErr) errors.qty = qtyErr;
+    const locErr = validateLocation(location);
+    if (locErr) errors.location = locErr;
 
-  // STEP 2: Accept price
-  async function handleAcceptPrice() {
-    if (!createdListing) {
-      setError('Listing not found. Please go back and recreate.');
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      addToast({
+        type: 'warning',
+        title: 'Missing Information',
+        message: `Please fill in the required fields: ${Object.values(errors).join(', ')}`,
+        duration: 5000,
+      });
       return;
     }
-    
-    let finalPricePerKg = null;
-    if (priceSource === 'ai' && selectedPricePerKg) {
-      finalPricePerKg = selectedPricePerKg;
-    } else if (priceSource === 'manual' && manualPricePerKg) {
-      finalPricePerKg = parseFloat(manualPricePerKg);
-    }
-    
-    if (!finalPricePerKg || finalPricePerKg <= 0) {
-      setError('Please select or enter a valid price');
-      return;
-    }
-    
-    const finalPriceTotal = finalPricePerKg * quantityNum;
-    
-    setError('');
+
+    const mappedSubtype = subtype ? (SUBTYPE_MAP[subtype] || subtype) : 'Mixed';
     setLoading(true);
     try {
-      const pricePayload = {
-        price_per_kg: finalPricePerKg,
-        final_price: finalPriceTotal,
-        base_price: aiPricing?.baseRate || finalPricePerKg,
-        quality_adjustment: aiPricing?.adjustments?.quality || 0,
-        volume_adjustment: aiPricing?.adjustments?.volume || 0,
+      const listingPayload = {
+        waste_type: wasteType,
+        subtype: mappedSubtype,
+        quantity_kg: quantityNum,
+        condition,
+        collection_point: collectionPoint,
+        county,
+        location: location || `${county}, Kenya`,
+        ...(lat && { lat }),
+        ...(lng && { lng }),
       };
-      
-      console.log('💰 Accepting price:', pricePayload);
-      const updatedListing = await listingsService.acceptPrice(createdListing.id, pricePayload);
-      console.log('✅ Price accepted:', updatedListing);
-      
-      setCreatedListing(updatedListing);
-      setStep(3);
+      const listing = await listingsService.create(listingPayload);
+      setCreatedListing(listing);
+      addToast({ type: 'success', title: 'Details Saved', message: 'Waste details saved. Now set your price.' });
+      setStep(2);
     } catch (e) {
-      console.error('❌ Failed to accept price:', e);
-      setError(e.message || 'Failed to save price. Please try again.');
+      console.error('Failed to create listing:', e);
+      addToast({ type: 'error', title: 'Failed to Save', message: e.message || 'Could not save your listing. Please try again.' });
     } finally {
       setLoading(false);
     }
   }
 
-  // STEP 3: Upload images
-  async function handleUploadImages() {
+  async function handleAcceptPrice() {
     if (!createdListing) {
-      setError('Listing not found. Please go back and recreate.');
+      addToast({ type: 'error', title: 'Listing Not Found', message: 'Please go back and recreate your listing.' });
       return;
     }
-    
-    setError('');
+    let finalPricePerKg = priceSource === 'ai' ? selectedPricePerKg : parseFloat(manualPricePerKg);
+    if (!finalPricePerKg || finalPricePerKg <= 0) {
+      addToast({ type: 'warning', title: 'Price Required', message: 'Please select or enter a valid price per kg.' });
+      return;
+    }
     setLoading(true);
     try {
-      if (files.length > 0) {
-        console.log('📸 Uploading images...', files.length);
-        await listingsService.uploadImages(createdListing.id, files);
-        console.log('✅ Images uploaded');
-      }
-      
-      if (files.length === 0) {
-        console.log('📤 No images, submitting listing...');
-        await listingsService.submit(createdListing.id);
-      }
-      
+      const updatedListing = await listingsService.acceptPrice(createdListing.id, {
+        price_per_kg: finalPricePerKg,
+        final_price: finalPricePerKg * quantityNum,
+        base_price: aiPricing?.baseRate || finalPricePerKg,
+        quality_adjustment: aiPricing?.adjustments?.quality || 0,
+        volume_adjustment: aiPricing?.adjustments?.volume || 0,
+      });
+      setCreatedListing(updatedListing);
+      addToast({ type: 'success', title: 'Price Confirmed', message: `${formatKES(finalPricePerKg)}/kg locked in. Add photos next.` });
+      setStep(3);
+    } catch (e) {
+      addToast({ type: 'error', title: 'Failed to Save Price', message: e.message || 'Please try again.' });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleUploadImages() {
+    if (!createdListing) {
+      addToast({ type: 'error', title: 'Listing Not Found', message: 'Please go back and recreate your listing.' });
+      return;
+    }
+    setLoading(true);
+    try {
+      if (files.length > 0) await listingsService.uploadImages(createdListing.id, files);
+      else await listingsService.submit(createdListing.id);
+      addToast({ type: 'success', title: 'Listing Submitted!', message: 'Your listing is pending verification.', duration: 5000 });
       setStep(4);
     } catch (e) {
-      console.error('❌ Upload failed:', e);
-      setError(e.message || 'Upload failed. Your listing was saved — you can skip images.');
+      addToast({ type: 'warning', title: 'Upload Issue', message: 'Images could not upload, but your listing was saved.' });
       setStep(4);
     } finally {
       setLoading(false);
@@ -377,41 +437,65 @@ async function handleCreateListing() {
   }
 
   function reset() {
-  setStep(1); setWasteType(''); setSubtype(''); setQty('');
-  setCondition('clean'); setCollectionPoint('commercial'); setCounty('Nairobi');
-  setNotes(''); setSelectedPricePerKg(null); 
-  setManualPricePerKg(''); setPriceSource('ai'); setAiPricing(null);
-  setLocation(''); setLat(null); setLng(null);
-  setFiles([]); setPreviews([]); setCreatedListing(null); setError('');
-  clearVision(); // ✅ moved here from handleConfirmSubmit
-}
+    setStep(1); setWasteType(''); setSubtype(''); setQty('');
+    setCondition('clean'); setCollectionPoint('commercial'); setCounty('Nairobi');
+    setDistanceKm(5); setNotes(''); setSelectedPricePerKg(null);
+    setManualPricePerKg(''); setPriceSource('ai'); setAiPricing(null);
+    setLocation(''); setLat(null); setLng(null);
+    setFiles([]); setPreviews([]); setCreatedListing(null); setFieldErrors({});
+  }
 
   const formatKES = (amount) => `KES ${Math.round(amount).toLocaleString()}`;
 
-  // Step 1: Details with Location
+  const inputStyle = (fieldName) => ({
+    ...(fieldErrors[fieldName] ? {
+      borderColor: '#fca5a5',
+      background: '#fff8f8',
+      boxShadow: '0 0 0 3px rgba(239,68,68,0.08)',
+    } : {}),
+  });
+
+  // ── Render Steps ──────────────────────────────────────────────────────
+
   const renderDetailsStep = () => (
     <div className="card">
       <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Step 1 — Waste Details</div>
 
+      {/* Waste Type */}
       <div className="form-group">
         <label className="form-label">Waste Type *</label>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 8 }}>
-          {wasteTypeArray.map((wt) => (
-            <div key={wt.label}
-              onClick={() => { setWasteType(wt.label); setSubtype(''); }}
-              style={{
-                padding: '10px 8px', cursor: 'pointer', textAlign: 'center',
-                border: `2px solid ${wasteType === wt.label ? 'var(--olive)' : 'var(--border)'}`,
-                borderRadius: 'var(--r2)',
-                background: wasteType === wt.label ? 'var(--olive-bg)' : 'var(--white)',
-              }}>
-              <div style={{ fontSize: 20 }}>{EMOJI_MAP[wt.label] || '♻️'}</div>
-              <div style={{ fontSize: 12, fontWeight: 600, marginTop: 4 }}>
-                {wt.label}
+          {wasteTypeArray.map((wt) => {
+            const cfg = WASTE_TILE_CONFIG[wt.label];
+            const LIcon = cfg?.LucideIcon;
+            const selected = wasteType === wt.label;
+            const iconColor = selected ? cfg?.color : '#9ca3af';
+            const tileBg = selected ? cfg?.selectedBg : (fieldErrors.wasteType ? '#fff8f8' : '#fff');
+            const tileBorder = selected ? cfg?.selectedBorder : (fieldErrors.wasteType ? '#fca5a5' : '#e5e7eb');
+            return (
+              <div key={wt.label}
+                onClick={() => { setWasteType(wt.label); setSubtype(''); clearFieldError('wasteType'); }}
+                style={{
+                  padding: '14px 8px 10px', cursor: 'pointer', textAlign: 'center',
+                  border: `2px solid ${tileBorder}`,
+                  borderRadius: 12,
+                  background: tileBg,
+                  transition: 'border-color 0.15s, background 0.15s, transform 0.1s',
+                  transform: selected ? 'scale(1.03)' : 'scale(1)',
+                  boxShadow: selected ? `0 4px 12px ${cfg?.color}30` : '0 1px 3px rgba(0,0,0,0.04)',
+                }}>
+                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 6 }}>
+                  {LIcon
+                    ? <LIcon size={32} color={iconColor} strokeWidth={1.5} />
+                    : <SvgIcon size={32} d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3M4 7h16" color={iconColor} />
+                  }
+                </div>
+                <div style={{ fontSize: 11.5, fontWeight: 600, color: selected ? cfg?.color : '#374151', letterSpacing: '0.01em' }}>{wt.label}</div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
+        <FieldError message={fieldErrors.wasteType} />
       </div>
 
       {selectedType?.subtypes?.length > 0 && (
@@ -427,20 +511,25 @@ async function handleCreateListing() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div className="form-group">
           <label className="form-label">Quantity (kg) *</label>
-          <input className="form-input" type="number" min="0.1" step="0.1" value={qty}
-            onChange={e => setQty(e.target.value)} placeholder="e.g., 50" />
+          <input
+            className="form-input"
+            type="number" min="0.1" step="0.1" value={qty}
+            onChange={e => { setQty(e.target.value); clearFieldError('qty'); }}
+            onBlur={e => { const err = validateQty(e.target.value); if (err) setFieldError('qty', err); }}
+            placeholder="e.g., 50"
+            style={inputStyle('qty')}
+          />
+          <FieldError message={fieldErrors.qty} />
         </div>
         <div className="form-group">
           <label className="form-label">Condition *</label>
           <select className="form-input" value={condition} onChange={e => setCondition(e.target.value)}>
-            {CONDITIONS.map(c => (
-              <option key={c.value} value={c.value}>{c.label}</option>
-            ))}
+            {CONDITIONS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
           </select>
         </div>
       </div>
 
-      {/* Location Section */}
+      {/* Location */}
       <div className="form-group">
         <label className="form-label">Pickup Location *</label>
         <button
@@ -448,34 +537,65 @@ async function handleCreateListing() {
           onClick={getCurrentLocation}
           disabled={isLocating}
           style={{
-            width: '100%',
-            padding: '10px',
-            marginBottom: '12px',
-            background: '#f0f5ec',
-            border: '1px solid #2A6A2A',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: '500',
-            color: '#2A6A2A',
+            width: '100%', padding: '10px', marginBottom: '12px',
+            background: '#f0f5ec', border: '1px solid #2A6A2A', borderRadius: '8px',
+            cursor: 'pointer', fontSize: '14px', fontWeight: '500', color: '#2A6A2A',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            opacity: isLocating ? 0.7 : 1, transition: 'opacity 0.2s',
           }}
         >
-          {isLocating ? '📍 Getting your location...' : '📍 Use My Current Location'}
+          {isLocating ? (
+            <><Icons.Loader /><span>Getting your location…</span></>
+          ) : (
+            <><Icons.Crosshair /><span>Use My Current Location</span></>
+          )}
         </button>
-        
-        <input
-          className="form-input"
-          type="text"
-          value={location}
-          onChange={(e) => setLocation(e.target.value)}
-          placeholder="Enter your pickup address (e.g., Westlands, Nairobi)"
-        />
-        
+
+        <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
+          <input
+            className="form-input"
+            type="text"
+            value={location}
+            onChange={e => { setLocation(e.target.value); setShowSuggestions(true); clearFieldError('location'); }}
+            onFocus={() => setShowSuggestions(true)}
+            onBlur={() => { const err = validateLocation(location); if (err) setFieldError('location', err); }}
+            placeholder="Enter your pickup address (e.g., Westlands, Nairobi)"
+            style={inputStyle('location')}
+          />
+          {showSuggestions && suggestions.length > 0 && (
+            <div style={{
+              position: 'absolute', top: '100%', left: 0, right: 0,
+              background: '#fff', border: '1px solid #ddd', borderRadius: 8,
+              zIndex: 9999, maxHeight: 240, overflowY: 'auto',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+            }}>
+              {suggestions.map(item => {
+                const p = item.properties;
+                return (
+                  <div key={p.place_id}
+                    onClick={() => { setLocation(p.formatted); setLat(p.lat); setLng(p.lon); setSuggestions([]); setShowSuggestions(false); clearFieldError('location'); }}
+                    style={{ padding: 10, cursor: 'pointer', borderBottom: '1px solid #eee', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}
+                  >
+                    <Icons.MapPin /><span>{p.formatted}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {loadingSuggestions && (
+            <div style={{ fontSize: 11, color: '#666', marginTop: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Icons.Loader />Searching locations…
+            </div>
+          )}
+        </div>
+
         {lat && lng && (
-          <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
-            📍 Coordinates: {lat.toFixed(6)}, {lng.toFixed(6)}
+          <div style={{ fontSize: 11, color: '#2A6A2A', marginTop: 5, display: 'flex', alignItems: 'center', gap: 4, fontWeight: 500 }}>
+            <Icons.MapPin />
+            Coordinates: {lat.toFixed(6)}, {lng.toFixed(6)}
           </div>
         )}
+        <FieldError message={fieldErrors.location} />
       </div>
 
       <div className="form-group">
@@ -485,25 +605,37 @@ async function handleCreateListing() {
         </select>
       </div>
 
+      {/* Collection Point */}
       <div className="form-group">
         <label className="form-label">Collection Point Type *</label>
-        <select 
-          className="form-input" 
-          value={collectionPoint} 
-          onChange={e => setCollectionPoint(e.target.value)}
-        >
-          {COLLECTION_POINTS.map(cp => (
-            <option key={cp.value} value={cp.value}>
-              {cp.label} - {cp.desc}
-            </option>
-          ))}
-        </select>
-        <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
-          💡 Industrial and commercial waste gets better rates
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+          {COLLECTION_POINTS.map(cp => {
+            const CIcon = CollectionIcons[cp.value];
+            const selected = collectionPoint === cp.value;
+            return (
+              <div key={cp.value}
+                onClick={() => setCollectionPoint(cp.value)}
+                style={{
+                  padding: '10px 8px', cursor: 'pointer', textAlign: 'center',
+                  border: `2px solid ${selected ? 'var(--olive)' : 'var(--border)'}`,
+                  borderRadius: 'var(--r2)',
+                  background: selected ? 'var(--olive-bg)' : 'var(--white)',
+                  transition: 'border-color 0.15s, background 0.15s',
+                }}>
+                <div style={{ display: 'flex', justifyContent: 'center', color: selected ? '#2A6A2A' : '#666', marginBottom: 4 }}>
+                  {CIcon && <CIcon />}
+                </div>
+                <div style={{ fontSize: 11, fontWeight: 600, color: selected ? '#2A6A2A' : '#444' }}>{cp.label}</div>
+                <div style={{ fontSize: 10, color: '#888', marginTop: 2, lineHeight: 1.3 }}>{cp.desc}</div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ fontSize: 11, color: '#666', marginTop: 5, display: 'flex', alignItems: 'center', gap: 5 }}>
+          <Icons.TrendingUp />
+          Industrial and commercial waste gets better rates
         </div>
       </div>
-
-      
 
       <div className="form-group">
         <label className="form-label">Notes (optional)</label>
@@ -518,12 +650,15 @@ async function handleCreateListing() {
     </div>
   );
 
-  // Step 2: Pricing
   const renderPricingStep = () => (
     <div className="card">
-      <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>
+      <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
         Step 2 — Confirm Your Price
-        {pricingLoading && <span style={{ marginLeft: 10, fontSize: 12, color: '#666' }}>🤖 AI analyzing market...</span>}
+        {pricingLoading && (
+          <span style={{ fontSize: 12, color: '#666', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 400 }}>
+            <Icons.Loader />Analyzing market…
+          </span>
+        )}
       </div>
 
       {aiPricing && !pricingLoading ? (
@@ -532,34 +667,25 @@ async function handleCreateListing() {
             <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
               <span style={{
                 padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
-                background: aiPricing.marketInfo.tier === 'formal' ? '#E8F5E9' : 
-                           aiPricing.marketInfo.tier === 'semi_formal' ? '#FFF8E1' : '#FFF3E0',
-                color: aiPricing.marketInfo.tier === 'formal' ? '#2A6A2A' : 
-                       aiPricing.marketInfo.tier === 'semi_formal' ? '#7A5A00' : '#8A4000',
+                background: aiPricing.marketInfo.tier === 'formal' ? '#E8F5E9' : aiPricing.marketInfo.tier === 'semi_formal' ? '#FFF8E1' : '#FFF3E0',
+                color: aiPricing.marketInfo.tier === 'formal' ? '#2A6A2A' : aiPricing.marketInfo.tier === 'semi_formal' ? '#7A5A00' : '#8A4000',
               }}>
                 {aiPricing.marketInfo.tier?.replace('_', ' ')} tier
               </span>
               <span style={{
                 padding: '4px 12px', borderRadius: 20, fontSize: 12, background: '#F5F5F5',
-                color: aiPricing.marketInfo.signal === 'stable' ? '#2A6A2A' : 
-                       aiPricing.marketInfo.signal === 'moderate' ? '#7A5A00' : '#8A2020',
+                color: aiPricing.marketInfo.signal === 'stable' ? '#2A6A2A' : aiPricing.marketInfo.signal === 'moderate' ? '#7A5A00' : '#8A2020',
               }}>
                 {aiPricing.marketInfo.signal} market
               </span>
             </div>
           )}
 
-          <div style={{
-            background: '#f0f5ec',
-            padding: 16, borderRadius: 12, marginBottom: 16,
-            border: '1px solid #c8e0c8'
-          }}>
-            <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>
-              🤖 AI Market Recommendation
+          <div style={{ background: '#f0f5ec', padding: 16, borderRadius: 12, marginBottom: 16, border: '1px solid #c8e0c8' }}>
+            <div style={{ fontSize: 12, color: '#666', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Icons.Sparkles />AI Market Recommendation
             </div>
-            <div style={{ fontSize: 14, color: '#444', marginBottom: 4 }}>
-              Rate per kilogram
-            </div>
+            <div style={{ fontSize: 14, color: '#444', marginBottom: 4 }}>Rate per kilogram</div>
             <div style={{ fontSize: 32, fontWeight: 700, color: '#2A6A2A' }}>
               {formatKES(aiPricing.perKgRange?.recommended || aiPricing.priceRange?.recommended)}/kg
             </div>
@@ -577,33 +703,17 @@ async function handleCreateListing() {
 
           {aiPricing.marketInfo?.advice && (
             <Alert type="info" style={{ marginBottom: 16, fontSize: 12 }}>
-              💡 {aiPricing.marketInfo.advice}
+              {aiPricing.marketInfo.advice}
             </Alert>
           )}
 
           <div style={{ marginBottom: 16 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
-              <input
-                type="radio"
-                checked={priceSource === 'ai'}
-                onChange={() => {
-                  setPriceSource('ai');
-                  setSelectedPricePerKg(aiPricing.perKgRange?.recommended || aiPricing.priceRange?.recommended);
-                }}
-              />
-              <span>
-                Use AI recommended price <strong>{formatKES(aiPricing.perKgRange?.recommended || aiPricing.priceRange?.recommended)}/kg</strong>
-              </span>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, cursor: 'pointer' }}>
+              <input type="radio" checked={priceSource === 'ai'} onChange={() => { setPriceSource('ai'); setSelectedPricePerKg(aiPricing.perKgRange?.recommended || aiPricing.priceRange?.recommended); }} />
+              <span>Use AI recommended price <strong>{formatKES(aiPricing.perKgRange?.recommended || aiPricing.priceRange?.recommended)}/kg</strong></span>
             </label>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <input
-                type="radio"
-                checked={priceSource === 'manual'}
-                onChange={() => {
-                  setPriceSource('manual');
-                  setSelectedPricePerKg(null);
-                }}
-              />
+            <label style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
+              <input type="radio" checked={priceSource === 'manual'} onChange={() => { setPriceSource('manual'); setSelectedPricePerKg(null); }} />
               <span>Set my own price (KES/kg)</span>
             </label>
           </div>
@@ -612,30 +722,19 @@ async function handleCreateListing() {
             <div className="form-group">
               <label className="form-label">Your Price (KES per kg)</label>
               <input
-                className="form-input"
-                type="number"
-                min="0"
-                step="0.5"
-                value={manualPricePerKg}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  setManualPricePerKg(e.target.value);
-                  setSelectedPricePerKg(isNaN(val) ? null : val);
-                }}
+                className="form-input" type="number" min="0" step="0.5" value={manualPricePerKg}
+                onChange={e => { const v = parseFloat(e.target.value); setManualPricePerKg(e.target.value); setSelectedPricePerKg(isNaN(v) ? null : v); }}
                 placeholder={`e.g., ${Math.round((aiPricing.perKgRange?.recommended || 13) * 0.9)}`}
               />
             </div>
           )}
 
           {selectedPricePerKg && (
-          <div style={{
-            marginTop: 16, padding: 12, borderRadius: 8,
-            background: '#f5f5f5', fontSize: 13
-          }}>
-            <strong>Your selected price:</strong><br />
-            {formatKES(selectedPricePerKg)}/kg × {quantityNum} kg = <strong>{formatKES(selectedPricePerKg * quantityNum)} total</strong>
-          </div>
-        )}
+            <div style={{ marginTop: 16, padding: 12, borderRadius: 8, background: '#f5f5f5', fontSize: 13 }}>
+              <strong>Your selected price:</strong><br />
+              {formatKES(selectedPricePerKg)}/kg × {quantityNum} kg = <strong>{formatKES(selectedPricePerKg * quantityNum)} total</strong>
+            </div>
+          )}
 
           <div style={{ marginTop: 16, marginBottom: 24, fontSize: 12, color: '#666' }}>
             Model confidence: {Math.round((aiPricing.confidence || 0.85) * 100)}%
@@ -644,28 +743,15 @@ async function handleCreateListing() {
       ) : pricingLoading ? (
         <div style={{ textAlign: 'center', padding: '40px 0' }}>
           <div className="loading-spinner" style={{ margin: '0 auto' }} />
-          <div style={{ marginTop: 12, color: '#666' }}>
-            Fetching real-time market rates...
-          </div>
+          <div style={{ marginTop: 12, color: '#666' }}>Fetching real-time market rates…</div>
         </div>
       ) : (
         <div>
-          <Alert type="warn" style={{ marginBottom: 16 }}>
-            AI pricing temporarily unavailable. Please enter price manually.
-          </Alert>
+          <Alert type="warn" style={{ marginBottom: 16 }}>AI pricing temporarily unavailable. Please enter price manually.</Alert>
           <div className="form-group">
             <label className="form-label">Your Price (KES per kg)</label>
-            <input
-              className="form-input"
-              type="number"
-              min="0"
-              step="0.5"
-              value={manualPricePerKg}
-              onChange={(e) => {
-                const val = parseFloat(e.target.value);
-                setManualPricePerKg(e.target.value);
-                setSelectedPricePerKg(isNaN(val) ? null : val);
-              }}
+            <input className="form-input" type="number" min="0" step="0.5" value={manualPricePerKg}
+              onChange={e => { const v = parseFloat(e.target.value); setManualPricePerKg(e.target.value); setSelectedPricePerKg(isNaN(v) ? null : v); }}
               placeholder="e.g., 45"
             />
           </div>
@@ -673,395 +759,94 @@ async function handleCreateListing() {
       )}
 
       <div style={{ display: 'flex', gap: 10, marginTop: 24 }}>
-        <Button variant="secondary" onClick={() => setStep(1)}>
-          ← Back to Details
-        </Button>
-        <Button 
-          variant="primary" 
-          onClick={handleAcceptPrice}
-          loading={loading}
-          disabled={!selectedPricePerKg && priceSource === 'manual' && !manualPricePerKg}
-        >
+        <Button variant="secondary" onClick={() => setStep(1)}>← Back to Details</Button>
+        <Button variant="primary" onClick={handleAcceptPrice} loading={loading}
+          disabled={!selectedPricePerKg && priceSource === 'manual' && !manualPricePerKg}>
           Accept Price & Continue →
         </Button>
       </div>
     </div>
   );
-  const handleConfirmSubmit = async () => {
-  if (!createdListing) {
-    setError('Listing not found');
-    return;
-  }
-  
-  setLoading(true);
-  try {
-    // If you have vision results, you might want to verify again
-    if (visionResult?.verdict === 'verified') {
-      await listingsService.submit(createdListing.id);
-    } else {
-      // For low confidence or rejected, still submit but flag for review
-      await listingsService.submitForReview(createdListing.id);
-    }
-    setStep(4);
-  } catch (err) {
-    console.error('Submission failed:', err);
-    setError(err.message || 'Submission failed. Please try again.');
-  } finally {
-    setLoading(false);
-  }
-};
-  // Step 3: Upload
-  const renderUploadStep = () => {
-  const verdictConfig = {
-    verified:       { color: '#2A6A2A', bg: '#E8F5E9', label: 'Verified ✓',              canSubmit: true  },
-    low_confidence: { color: '#7A5A00', bg: '#FFF8E1', label: 'Low Confidence — Add more images', canSubmit: false },
-    rejected:       { color: '#8A2020', bg: '#FFEBEE', label: 'Manual Review Required',  canSubmit: false },
-  };
-  const vc = visionResult ? verdictConfig[visionResult.verdict] : null;
- 
-  return (
+
+  const renderUploadStep = () => (
     <div className="card">
-      <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>
-        Step 3 — Photo Verification
-      </div>
-      <div style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>
-        Upload photos of your waste. Our AI will verify the material type before submission.
-        This step is required and cannot be skipped.
-      </div>
- 
-      {/* Photo guidelines */}
-      {!visionResult && (
-        <div style={{
-          background: '#f0f5ec',
-          borderRadius: 8,
-          padding: '10px 14px',
-          marginBottom: 14,
-          fontSize: 12,
-          color: '#555',
+      <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Step 3 — Upload Photos</div>
+      <div style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>Upload up to 5 photos. Clear images improve matching speed.</div>
+
+      <div
+        onDragOver={e => { e.preventDefault(); setDrag(true); }}
+        onDragLeave={() => setDrag(false)}
+        onDrop={handleDrop}
+        onClick={() => fileRef.current?.click()}
+        style={{
+          border: `2px dashed ${drag ? '#2A6A2A' : '#ddd'}`, borderRadius: '8px',
+          padding: '32px 20px', textAlign: 'center', cursor: 'pointer', marginBottom: 16,
+          background: drag ? '#f0f5ec' : '#fafaf8', transition: 'border-color 0.15s, background 0.15s',
         }}>
-          📸 <strong>Photo tips for best verification results:</strong>
-          <ul style={{ margin: '6px 0 0 16px', padding: 0 }}>
-            <li>Place material on a dark contrasting background</li>
-            <li>Fill at least 70% of the frame with the material</li>
-            <li>Upload 3–5 photos from different angles</li>
-            <li>Avoid backlighting and flash glare</li>
-          </ul>
-        </div>
-      )}
- 
-      {/* Upload zone — shown until verification is run */}
-      {!visionResult && (
-        <>
-          <div
-            onDragOver={e => { e.preventDefault(); setDrag(true); }}
-            onDragLeave={() => setDrag(false)}
-            onDrop={handleDrop}
-            onClick={() => fileRef.current?.click()}
-            style={{
-              border: `2px dashed ${drag ? '#2A6A2A' : '#ddd'}`,
-              borderRadius: 8,
-              padding: '32px 20px',
-              textAlign: 'center',
-              cursor: 'pointer',
-              marginBottom: 16,
-              background: drag ? '#f0f5ec' : '#fafaf8',
-            }}
-          >
-            <div style={{ fontSize: 28, marginBottom: 8 }}>📷</div>
-            <div style={{ fontWeight: 600, fontSize: 14 }}>
-              Drop images here or click to browse
-            </div>
-            <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
-              PNG, JPG · Upload 3–5 photos from different angles
-            </div>
-            <input
-              ref={fileRef}
-              type="file"
-              accept="image/*"
-              multiple
-              style={{ display: 'none' }}
-              onChange={e => handleFile(e.target.files)}
-            />
-          </div>
- 
-          {/* Thumbnails */}
-          {previews.length > 0 && (
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
-              {previews.map((src, i) => (
-                <div key={i} style={{ position: 'relative', width: 80, height: 80 }}>
-                  <img
-                    src={src}
-                    alt=""
-                    style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8 }}
-                  />
-                  <button
-                    onClick={e => { e.stopPropagation(); removeFile(i); }}
-                    style={{
-                      position: 'absolute', top: -6, right: -6,
-                      width: 20, height: 20, borderRadius: '50%',
-                      background: '#E05050', border: 'none',
-                      color: '#fff', fontSize: 12, cursor: 'pointer',
-                    }}
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-              <div style={{ fontSize: 12, color: '#666', alignSelf: 'center' }}>
-                {files.length} image{files.length > 1 ? 's' : ''} selected
-              </div>
-            </div>
-          )}
-        </>
-      )}
- 
-      {/* CV Verification loading */}
-      {visionLoading && (
-        <div style={{ textAlign: 'center', padding: '32px 0' }}>
-          <div className="loading-spinner" style={{ margin: '0 auto 12px', width: 32, height: 32 }} />
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#2A6A2A' }}>
-            Running AI Verification…
-          </div>
-          <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>
-            Analysing {files.length} image{files.length > 1 ? 's' : ''} across SM1 → SM2 → SM3 → SM4
-          </div>
-        </div>
-      )}
- 
-      {/* CV Error */}
-      {visionError && !visionLoading && (
-        <div style={{
-          background: '#FFEBEE', borderRadius: 8, padding: 14, marginBottom: 14,
-          fontSize: 13, color: '#8A2020',
-        }}>
-          ⚠️ Verification failed: {visionError}
-          <br />
-          <button
-            onClick={() => { clearVision(); }}
-            style={{ marginTop: 8, fontSize: 12, color: '#2A6A2A', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
-          >
-            Try again
-          </button>
-        </div>
-      )}
- 
-      {/* CV Result */}
-      {visionResult && !visionLoading && (
-        <div style={{ marginBottom: 16 }}>
- 
-          {/* Verdict banner */}
-          <div style={{
-            background: vc.bg,
-            border: `1px solid ${vc.color}`,
-            borderRadius: 8,
-            padding: '12px 16px',
-            marginBottom: 14,
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}>
-            <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: vc.color }}>
-                {vc.label}
-              </div>
-              <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
-                Detected: <strong>{visionResult.detectedType}</strong>
-                {visionResult.detectedSubtype && ` — ${visionResult.detectedSubtype}`}
-              </div>
-            </div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: vc.color }}>
-              {visionResult.confidence}%
-            </div>
-          </div>
- 
-          {/* Confidence bars */}
-          {[
-            { label: 'Detection Confidence', value: visionResult.confidence },
-            { label: 'Quality Score',         value: visionResult.qualityScore },
-            { label: 'Batch Consistency',     value: visionResult.consistencyScore },
-          ].map(({ label, value }) => (
-            <div key={label} style={{ marginBottom: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                <span style={{ color: '#666' }}>{label}</span>
-                <span style={{ fontWeight: 600, color: value < 65 ? '#C06010' : '#2A6A2A' }}>
-                  {value}%
-                </span>
-              </div>
-              <div style={{ height: 6, background: '#eee', borderRadius: 3 }}>
-                <div style={{
-                  height: 6, borderRadius: 3,
-                  width: `${value}%`,
-                  background: value < 65 ? '#F59E0B' : '#2A6A2A',
-                }} />
-              </div>
-            </div>
-          ))}
- 
-          {/* Notes from API */}
-          <div style={{
-            background: '#f5f5f5', borderRadius: 8, padding: '10px 12px',
-            fontSize: 12, color: '#555', marginTop: 10,
-          }}>
-            {visionResult.notes}
-          </div>
- 
-          {/* Rejected guidance */}
-          {visionResult.verdict === 'rejected' && (
-            <div style={{
-              background: '#FFEBEE', borderRadius: 8, padding: '10px 12px',
-              fontSize: 12, color: '#8A2020', marginTop: 10,
-            }}>
-              This listing has been flagged for manual administrator review.
-              You can still submit — an admin will review the images before approval.
-            </div>
-          )}
- 
-          {/* Low confidence guidance */}
-          {visionResult.verdict === 'low_confidence' && (
-            <div style={{ marginTop: 12 }}>
-              <div style={{ fontSize: 12, color: '#7A5A00', marginBottom: 8 }}>
-                Add more photos from different angles to improve your confidence score.
-              </div>
-              <button
-                onClick={() => { clearVision(); }}
-                style={{
-                  fontSize: 12, color: '#2A6A2A', background: '#f0f5ec',
-                  border: '1px solid #2A6A2A', borderRadius: 6,
-                  padding: '6px 12px', cursor: 'pointer',
-                }}
-              >
-                ← Add more photos
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}><Icons.Camera /></div>
+        <div style={{ fontWeight: 600, fontSize: 14 }}>Drop images here or click to browse</div>
+        <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>PNG, JPG up to 10 MB each · Max 5 images</div>
+        <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => handleFile(e.target.files)} />
+      </div>
+
+      {previews.length > 0 && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+          {previews.map((src, i) => (
+            <div key={i} style={{ position: 'relative', width: 80, height: 80 }}>
+              <img src={src} alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8 }} />
+              <button onClick={() => removeFile(i)} style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: '#E05050', border: 'none', color: '#fff', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Icons.X />
               </button>
             </div>
-          )}
+          ))}
         </div>
       )}
- 
-      {/* Action buttons */}
-      <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-        <Button variant="secondary" onClick={() => setStep(2)}>
-          ← Back to Price
+
+      <div style={{ display: 'flex', gap: 10 }}>
+        <Button variant="secondary" onClick={() => setStep(2)}>← Back to Price</Button>
+        <Button variant="primary" loading={loading} onClick={handleUploadImages}>
+          {files.length > 0 ? 'Upload & Submit' : 'Skip & Submit'}
         </Button>
- 
-        {/* Run verification — shown when images uploaded but not yet verified */}
-        {!visionResult && !visionLoading && (
-          <Button
-            variant="primary"
-            loading={visionLoading}
-            disabled={files.length === 0 || visionLoading}
-            onClick={handleUploadImages}
-          >
-            {files.length === 0
-              ? 'Upload images to verify'
-              : `Verify ${files.length} Image${files.length > 1 ? 's' : ''} with AI`}
-          </Button>
-        )}
- 
-        {/* Submit — only shown after successful verification */}
-        {visionResult && !visionLoading && (
-          <Button
-            variant="primary"
-            loading={loading}
-            onClick={handleConfirmSubmit}
-          >
-            {visionResult.verdict === 'verified'
-              ? 'Confirm & Submit Listing →'
-              : 'Submit for Manual Review →'}
-          </Button>
-        )}
       </div>
     </div>
   );
 
-}
-
-  // Step 4: Done
-  const renderDoneStep = () => {
-  const wasAutoApproved = visionResult?.verdict === 'verified';
-
-  return (
+  const renderDoneStep = () => (
     <div className="card" style={{ textAlign: 'center', padding: '40px 24px' }}>
-      <div style={{
-        width: 64, height: 64, borderRadius: '50%',
-        background: wasAutoApproved ? '#E0F0E0' : '#FFF8E1',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        margin: '0 auto 16px',
-      }}>
-        <Icon
-          name="check"
-          size={32}
-          color={wasAutoApproved ? '#2A6A2A' : '#7A5A00'}
-          strokeWidth={2.5}
-        />
+      <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#E0F0E0', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+        <Icons.CheckCircle />
       </div>
-
-      <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>
-        {wasAutoApproved ? 'Listing Auto-Approved! ✓' : 'Listing Submitted!'}
+      <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Listing Submitted!</div>
+      <div style={{ color: '#666', fontSize: 14, marginBottom: 24 }}>
+        Your listing is pending verification. We'll notify you once it's approved.
       </div>
-
-      <div style={{ color: '#666', fontSize: 14, marginBottom: 16 }}>
-        {wasAutoApproved
-          ? 'Your listing passed AI verification and is now live on the marketplace.'
-          : visionResult?.verdict === 'low_confidence'
-            ? 'Your listing has been submitted for administrator review. You may be asked to provide additional images.'
-            : 'Your listing has been flagged for manual review. An administrator will verify it shortly.'}
-      </div>
-
-      {/* Show CV score summary */}
-      {visionResult && (
-        <div style={{
-          background: wasAutoApproved ? '#E8F5E9' : '#FFF8E1',
-          border: `1px solid ${wasAutoApproved ? '#2A6A2A' : '#7A5A00'}`,
-          borderRadius: 8,
-          padding: '12px 16px',
-          marginBottom: 20,
-          textAlign: 'left',
-        }}>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 8 }}>
-            CV Verification Summary
-          </div>
-          {[
-            { label: 'Detection Confidence', value: visionResult.confidence },
-            { label: 'Quality Score',         value: visionResult.qualityScore },
-            { label: 'Batch Consistency',     value: visionResult.consistencyScore },
-          ].map(({ label, value }) => (
-            <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-              <span style={{ color: '#666' }}>{label}</span>
-              <span style={{ fontWeight: 600, color: value >= 85 ? '#2A6A2A' : '#7A5A00' }}>
-                {value}%
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
       <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
         <Button variant="primary" onClick={reset}>List Another</Button>
         <Button variant="secondary" onClick={() => onNavigate('dashboard')}>Dashboard</Button>
       </div>
     </div>
   );
-  };
+
   return (
-    <div className="page">
-      <div className="section-hd" style={{ marginBottom: 20 }}>
-        <div>
-          <div className="page-heading">List Your Waste</div>
-          <div style={{ fontSize: 13, color: '#666', marginTop: 2 }}>
-            Get AI-powered pricing &amp; matched with recyclers
+    <>
+      <ToastContainer />
+      <div className="page">
+        <div className="section-hd" style={{ marginBottom: 20 }}>
+          <div>
+            <div className="page-heading">List Your Waste</div>
+            <div style={{ fontSize: 13, color: '#666', marginTop: 2 }}>
+              Get AI-powered pricing &amp; matched with recyclers
+            </div>
           </div>
         </div>
+
+        <StepIndicator steps={STEPS} current={step} />
+
+        {step === 1 && renderDetailsStep()}
+        {step === 2 && renderPricingStep()}
+        {step === 3 && renderUploadStep()}
+        {step === 4 && renderDoneStep()}
       </div>
-
-      <StepIndicator steps={STEPS} current={step} />
-
-      {error && <Alert type="warn" style={{ margin: '16px 0' }}>{error}</Alert>}
-
-      {step === 1 && renderDetailsStep()}
-      {step === 2 && renderPricingStep()}
-      {step === 3 && renderUploadStep()}
-      {step === 4 && renderDoneStep()}
-    </div>
-  )
-  
+    </>
+  );
 }
