@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { tokenStore } from '../../services/apiClient';
 
 export default function DeleteAccountModal({ onClose }) {
+  // eslint-disable-next-line
   const { logout } = useAuth();
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');

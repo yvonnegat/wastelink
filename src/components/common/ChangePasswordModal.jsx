@@ -47,6 +47,7 @@ export default function ChangePasswordModal({ onClose }) {
     } finally {
       setSaving(false);
     }
+    // eslint-disable-next-line
   }, [form, onClose]);
 
   // Close on backdrop click

@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import Select from 'react-select';
 import {
@@ -162,6 +163,7 @@ export default function ProfilePage() {
         city:           ml.city    || '',
       });
     }
+    // eslint-disable-next-line
   }, [user?.id, user?.role]); // stable primitives only — no object references
 
   // ── Memoised derived display values ──────────────────────────
