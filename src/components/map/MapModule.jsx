@@ -1,8 +1,10 @@
 // src/components/map/MapModule.jsx
-// v8 — Fix: featureGroup bounds, auto-pan to nearest on location, better pins
+// v9 — Recycler view: clicking a waste generator marker shows their active listings inline
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback} from 'react';
 import { useMapLocations } from '../../hooks/useMapLocations';
+import { listingsService } from '../../services/ListingService';
+import api from '../../services/apiClient';
 
 const PIN_COLORS = {
   recycling_centre: '#1a6b45',
@@ -38,35 +40,13 @@ const ALL_WASTE_TYPES = [
   'Glass','Organic','Textiles','Tyres','Scrap Iron','Aluminum',
   'Styrofoam','Wood','Motor Oil','Cooking Oil',
 ];
-
-// ─── Icons ────────────────────────────────────────────────────
-// Recycling centre: leaf/recycle symbol inside pin
-// Lucide-style icon paths per location type
+// eslint-disable-next-line no-unused-vars
 const LUCIDE_PATHS = {
-  recycling_centre: `
-    <g transform="translate(7, 7) scale(0.92)">
-      <path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="m14 16-3 3 3 3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M8.293 13.596 7.196 9.5 3.1 10.598" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="m9.344 5.811 1.093-1.892A1.83 1.83 0 0 1 11.985 3a1.784 1.784 0 0 1 1.546.888l3.943 6.843" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="m13.378 9.633 4.096 1.098 1.097-4.096" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    </g>`,
-
-  collection_point: `
-    <g transform="translate(7, 8) scale(0.92)">
-      <polyline points="22 12 16 12 14 15 10 15 8 12 2 12" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-    </g>`,
-
-  waste_generator: `
-    <g transform="translate(7, 7) scale(0.92)">
-      <path d="M3 9h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="m3 9 2.45-4.9A2 2 0 0 1 7.24 3h9.52a2 2 0 0 1 1.8 1.1L21 9" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      <path d="M12 3v6" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"/>
-    </g>`,
+  recycling_centre: `<g transform="translate(7, 7) scale(0.92)"><path d="M7 19H4.815a1.83 1.83 0 0 1-1.57-.881 1.785 1.785 0 0 1-.004-1.784L7.196 9.5" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 19h8.203a1.83 1.83 0 0 0 1.556-.89 1.784 1.784 0 0 0 0-1.775l-1.226-2.12" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="m14 16-3 3 3 3" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.293 13.596 7.196 9.5 3.1 10.598" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="m9.344 5.811 1.093-1.892A1.83 1.83 0 0 1 11.985 3a1.784 1.784 0 0 1 1.546.888l3.943 6.843" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="m13.378 9.633 4.096 1.098 1.097-4.096" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g>`,
+  collection_point: `<g transform="translate(7, 8) scale(0.92)"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g>`,
+  waste_generator:  `<g transform="translate(7, 7) scale(0.92)"><path d="M3 9h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="m3 9 2.45-4.9A2 2 0 0 1 7.24 3h9.52a2 2 0 0 1 1.8 1.1L21 9" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 3v6" fill="none" stroke="white" stroke-width="2" stroke-linecap="round"/></g>`,
 };
-
+// eslint-disable-next-line no-unused-vars
 function lighten(hex) {
   const n = parseInt(hex.replace('#', ''), 16);
   const r = Math.min(255, ((n >> 16) & 0xff) + 40);
@@ -78,15 +58,9 @@ function lighten(hex) {
 function makeSvgIcon(locationType) {
   const color = PIN_COLORS[locationType] || '#1a4731';
   const id = color.replace('#', '') + locationType;
-
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="36" viewBox="0 0 28 36">
-    <defs>
-      <filter id="sh${id}" x="-80%" y="-50%" width="260%" height="260%">
-        <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.22)"/>
-      </filter>
-    </defs>
-    <path d="M14 2 C8 2 3 7 3 13 C3 21 14 34 14 34 C14 34 25 21 25 13 C25 7 20 2 14 2 Z"
-      fill="${color}" filter="url(#sh${id})"/>
+    <defs><filter id="sh${id}" x="-80%" y="-50%" width="260%" height="260%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.22)"/></filter></defs>
+    <path d="M14 2 C8 2 3 7 3 13 C3 21 14 34 14 34 C14 34 25 21 25 13 C25 7 20 2 14 2 Z" fill="${color}" filter="url(#sh${id})"/>
     <circle cx="14" cy="13" r="4.5" fill="white" opacity="0.95"/>
     <circle cx="14" cy="13" r="2" fill="${color}"/>
   </svg>`;
@@ -96,14 +70,10 @@ function makeSvgIcon(locationType) {
 function makeNumberedPin(number, color = '#f59e0b') {
   const id = color.replace('#','');
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="36" height="48" viewBox="0 0 36 48">
-    <defs><filter id="shn${id}${number}" x="-50%" y="-30%" width="200%" height="200%">
-      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="rgba(0,0,0,0.28)"/>
-    </filter></defs>
-    <path d="M18 2 C10 2 4 8 4 16 C4 26 18 46 18 46 C18 46 32 26 32 16 C32 8 26 2 18 2 Z"
-      fill="${color}" filter="url(#shn${id}${number})"/>
+    <defs><filter id="shn${id}${number}" x="-50%" y="-30%" width="200%" height="200%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="rgba(0,0,0,0.28)"/></filter></defs>
+    <path d="M18 2 C10 2 4 8 4 16 C4 26 18 46 18 46 C18 46 32 26 32 16 C32 8 26 2 18 2 Z" fill="${color}" filter="url(#shn${id}${number})"/>
     <circle cx="18" cy="16" r="11" fill="rgba(255,255,255,0.2)"/>
-    <text x="18" y="21" text-anchor="middle" font-size="14" font-weight="800"
-      font-family="system-ui,sans-serif" fill="white">${number}</text>
+    <text x="18" y="21" text-anchor="middle" font-size="14" font-weight="800" font-family="system-ui,sans-serif" fill="white">${number}</text>
   </svg>`;
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
@@ -117,7 +87,6 @@ function makeUserDotIcon() {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
-// ─── Constants ────────────────────────────────────────────────
 const DEFAULT_CENTER = [-1.2921, 36.8219];
 const DEFAULT_ZOOM   = 11;
 const MAX_TRIP_STOPS = 5;
@@ -130,6 +99,7 @@ function distKm(lat1, lng1, lat2, lng2) {
 function fmtDur(s){const m=Math.round(s/60);return m<60?`${m} min`:`${Math.floor(m/60)}h ${m%60}min`;}
 function fmtDist(m){return m<1000?`${Math.round(m)} m`:`${(m/1000).toFixed(1)} km`;}
 
+// eslint-disable-next-line no-unused-vars
 async function searchPlaces(query) {
   if(!query||query.length<2) return [];
   try {
@@ -165,50 +135,64 @@ async function fetchRoute(fLat,fLng,tLat,tLng) {
   } catch{return null;}
 }
 
-// ─── Trip optimiser ────────────────────────────────────────────
 async function optimiseTripRoute(userPos, stops) {
-  const apiKey = process.env.REACT_APP_GEOAPIFY_KEY;
-
-  // Try Geoapify Route Planner for optimal order
-  let orderedStops = [...stops];
-  try {
-    const body = {
-      mode: 'drive',
-      agents: [{ start_location:[userPos[1],userPos[0]], end_location:[userPos[1],userPos[0]] }],
-      shipments: stops.map((s,i)=>({ id:`stop-${i}`, delivery:{ location:[s.lng,s.lat], duration:300 } })),
-    };
-    const planRes = await fetch(
-      `https://api.geoapify.com/v1/routeplanner?apiKey=${apiKey}`,
-      { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) }
-    );
-    const planData = await planRes.json();
-    if (planData.features?.length) {
-      const actions = planData.features[0]?.properties?.agent?.actions || [];
-      const ordered = actions
-        .filter(a=>a.type==='delivery'&&a.shipment_id)
-        .map(a=>{ const idx=parseInt(a.shipment_id.replace('stop-','')); return stops[idx]; })
-        .filter(Boolean);
-      if (ordered.length===stops.length) orderedStops=ordered;
+  if (!stops.length) return null;
+  
+  // Simple nearest neighbor optimization
+  let remaining = [...stops];
+  let orderedStops = [];
+  let currentPos = { lat: userPos[0], lng: userPos[1] };
+  
+  while (remaining.length > 0) {
+    // Find closest stop from current position
+    let closestIdx = 0;
+    let closestDist = distKm(currentPos.lat, currentPos.lng, remaining[0].lat, remaining[0].lng);
+    
+    for (let i = 1; i < remaining.length; i++) {
+      const d = distKm(currentPos.lat, currentPos.lng, remaining[i].lat, remaining[i].lng);
+      if (d < closestDist) {
+        closestDist = d;
+        closestIdx = i;
+      }
     }
-  } catch(e) { console.warn('Route planner fallback to original order:', e); }
-
-  // Get driving geometry for ordered route
+    
+    const nextStop = remaining[closestIdx];
+    orderedStops.push(nextStop);
+    currentPos = { lat: nextStop.lat, lng: nextStop.lng };
+    remaining.splice(closestIdx, 1);
+  }
+  
+  // Build waypoints string: start -> stops in optimized order -> return to start
   const waypoints = [
     `${userPos[0]},${userPos[1]}`,
-    ...orderedStops.map(s=>`${s.lat},${s.lng}`),
-    `${userPos[0]},${userPos[1]}`,
+    ...orderedStops.map(s => `${s.lat},${s.lng}`),
+    `${userPos[0]},${userPos[1]}`
   ].join('|');
-
+  
+  // Fetch the full route with all waypoints
+  const apiKey = process.env.REACT_APP_GEOAPIFY_KEY;
   const routeRes = await fetch(
     `https://api.geoapify.com/v1/routing?waypoints=${encodeURIComponent(waypoints)}&mode=drive&apiKey=${apiKey}`
   );
+  
+  if (!routeRes.ok) {
+    throw new Error(`Routing API error: ${routeRes.status}`);
+  }
+  
   const routeData = await routeRes.json();
-  const rf = routeData.features?.[0];
-  if (!rf) throw new Error('No route geometry returned');
-
-  return { orderedStops, geometry:rf.geometry, distance:rf.properties.distance, duration:rf.properties.time };
+  const routeFeature = routeData.features?.[0];
+  
+  if (!routeFeature) {
+    throw new Error('No route geometry returned');
+  }
+  
+  return {
+    orderedStops,
+    geometry: routeFeature.geometry,
+    distance: routeFeature.properties.distance,
+    duration: routeFeature.properties.time
+  };
 }
-
 function formatTime(t) {
   if(!t) return '';
   if(t.toLowerCase().includes('am')||t.toLowerCase().includes('pm')) return t.replace(':','.');
@@ -243,7 +227,364 @@ const MOCK_LOCATIONS = [
 ];
 
 // ══════════════════════════════════════════════════════════════
-// MY WASTE FILTER PANEL
+// INLINE MATCH MODAL — sits inside the panel, no navigation
+// ══════════════════════════════════════════════════════════════
+function InlineMatchModal({ listing, onClose, onSuccess }) {
+  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState('');
+  const tc = TYPE_COLORS[listing.waste_type] || { bg: '#f0f0f0', color: '#555' };
+
+  async function submit() {
+    setLoading(true); setError('');
+    try {
+      await api.post(`/recyclers/listings/${listing.id}/request-match`, {
+        message: message.trim() || null,
+      });
+      onSuccess();
+    } catch (e) {
+      setError(e.message || 'Could not send request. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div style={GP.modalOverlay}>
+      <div style={GP.modal}>
+        {/* Modal header */}
+        <div style={GP.modalHeader}>
+          <div>
+            <div style={GP.modalTitle}>Request Collection</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+              <span style={{ ...GP.subtypePill, background: tc.bg, color: tc.color, fontSize: 11 }}>
+                {listing.waste_type}
+              </span>
+              <span style={{ fontSize: 12, color: '#888' }}>
+                {listing.quantity_kg} kg
+                {listing.price_per_kg ? ` · KES ${listing.price_per_kg}/kg` : ''}
+              </span>
+            </div>
+          </div>
+          <button style={GP.closeBtn} onClick={onClose}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 6L6 18M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div style={{ margin: '0 0 12px', padding: '10px 12px', background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, fontSize: 12, color: '#b91c1c' }}>
+            {error}
+          </div>
+        )}
+
+        {/* Message input */}
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ fontSize: 12, fontWeight: 600, color: '#555', display: 'block', marginBottom: 6 }}>
+            Message to Seller <span style={{ fontWeight: 400, color: '#aaa' }}>(optional)</span>
+          </label>
+          <textarea
+            value={message}
+            onChange={e => setMessage(e.target.value)}
+            placeholder="Introduce yourself, your capacity, or when you can collect…"
+            rows={3}
+            style={{
+              width: '100%', boxSizing: 'border-box',
+              padding: '10px 12px', border: '1.5px solid #e5e7eb',
+              borderRadius: 8, fontSize: 13, resize: 'none', outline: 'none',
+              fontFamily: 'inherit', color: '#1a1a1a',
+            }}
+          />
+        </div>
+
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={onClose}
+            style={{ flex: 1, padding: '11px', background: 'white', border: '1.5px solid #e0e0e0', borderRadius: 10, fontSize: 13, fontWeight: 600, color: '#555', cursor: 'pointer' }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={loading}
+            style={{ flex: 2, padding: '11px', background: loading ? '#a7c4a7' : '#1a4731', color: 'white', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+          >
+            {loading && <span style={{ width: 12, height: 12, border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid white', borderRadius: '50%', animation: 'wlm-spin .7s linear infinite', flexShrink: 0 }} />}
+            {loading ? 'Sending…' : 'Send Request'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+// GENERATOR LISTINGS PANEL — shown when recycler clicks a waste generator pin
+// ══════════════════════════════════════════════════════════════
+function GeneratorListingsPanel({ loc, onClose, onGetDirections }) {
+  const [listings, setListings]       = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState(null);
+  const [activeListing, setActive]    = useState(null); // listing the recycler tapped
+  const [successId, setSuccessId]     = useState(null); // id of listing request was sent for
+
+  useEffect(() => {
+    if (!loc) return;
+    setLoading(true);
+    setError(null);
+    setActive(null);
+    setSuccessId(null);
+    listingsService.getFeed({ seller_id: loc.user_id, status: 'verified', limit: 10 })
+      .then(data => {
+        const items = Array.isArray(data) ? data : data?.data ?? [];
+        setListings(items);
+      })
+      .catch(() => setError('Could not load listings.'))
+      .finally(() => setLoading(false));
+  }, 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [loc?.id]);
+
+  const conditionLabel = { clean: 'Clean', mixed: 'Mixed', contaminated: 'Contaminated', baled: 'Baled' };
+
+  return (
+    <div style={GP.panel}>
+      {/* Inline match modal — renders on top of panel content */}
+      {activeListing && (
+        <InlineMatchModal
+          listing={activeListing}
+          onClose={() => setActive(null)}
+          onSuccess={() => {
+            setSuccessId(activeListing.id);
+            setActive(null);
+          }}
+        />
+      )}
+
+      {/* Header */}
+      <div style={GP.header}>
+        <div style={GP.headerLeft}>
+          <div style={GP.avatarDot} />
+          <div>
+            <div style={GP.name}>{loc.name}</div>
+            <div style={GP.sub}>
+              {loc.address || loc.city || ''}
+              {loc.is_verified && <span style={GP.verifiedPill}>✓ Verified</span>}
+            </div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button style={GP.dirBtn} onClick={() => onGetDirections(loc)}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="3 11 22 2 13 21 11 13 3 11"/>
+            </svg>
+            Directions
+          </button>
+          <button style={GP.closeBtn} onClick={onClose}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 6L6 18M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Listings header */}
+      <div style={GP.listingsHeader}>
+        <span style={GP.listingsTitle}>Available Waste Listings</span>
+        {!loading && !error && <span style={GP.listingsCount}>{listings.length} listing{listings.length !== 1 ? 's' : ''}</span>}
+      </div>
+
+      <div style={GP.listingsBody}>
+        {loading ? (
+          <div style={GP.center}>
+            <div style={GP.spinner} />
+            <span style={{ fontSize: 12, color: '#aaa', marginTop: 8 }}>Loading listings…</span>
+          </div>
+        ) : error ? (
+          <div style={GP.center}>
+            <span style={{ fontSize: 12, color: '#e07b2a' }}>{error}</span>
+          </div>
+        ) : listings.length === 0 ? (
+          <div style={GP.center}>
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#d0d0d0" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+            </svg>
+            <span style={{ fontSize: 13, color: '#bbb', marginTop: 8, textAlign: 'center' }}>
+              No active listings from this generator yet.
+            </span>
+          </div>
+        ) : (
+          listings.map(listing => {
+            const tc = TYPE_COLORS[listing.waste_type] || { bg: '#f0f0f0', color: '#555' };
+            const img = listing.listing_images?.find(i => i.is_primary) || listing.listing_images?.[0];
+            const requested = successId === listing.id;
+            return (
+              <div key={listing.id} style={{ borderBottom: '1px solid #f5f5f5' }}>
+                {/* Listing row */}
+                <div style={{ ...GP.listingCard, cursor: 'default' }}>
+                  {/* Thumbnail */}
+                  <div style={{ ...GP.thumb, background: img ? 'transparent' : tc.bg, overflow: 'hidden' }}>
+                    {img
+                      ? <img src={img.url} alt={listing.waste_type} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : <span style={{ fontSize: 18, color: tc.color }}>
+                          {listing.waste_type === 'Plastic' ? '♻' :
+                           listing.waste_type === 'Paper' ? '📄' :
+                           listing.waste_type === 'Metal' ? '⚙' :
+                           listing.waste_type === 'Glass' ? '🫙' :
+                           listing.waste_type === 'Organic' ? '🌿' :
+                           listing.waste_type === 'E-Waste' ? '💻' : '♻'}
+                        </span>
+                    }
+                  </div>
+
+                  {/* Details */}
+                  <div style={GP.listingInfo}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                      <span style={{ fontWeight: 700, fontSize: 13, color: '#1a1a1a' }}>{listing.waste_type}</span>
+                      {listing.subtype && (
+                        <span style={{ ...GP.subtypePill, background: tc.bg, color: tc.color }}>{listing.subtype}</span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 12, color: '#666', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 600, color: '#1a1a1a' }}>{listing.quantity_kg} kg</span>
+                      {listing.price_per_kg && (
+                        <span style={{ color: '#1a6b45', fontWeight: 600 }}>KES {listing.price_per_kg}/kg</span>
+                      )}
+                      {listing.condition && (
+                        <span style={{ color: '#888' }}>{conditionLabel[listing.condition] || listing.condition}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Action button */}
+                  {requested ? (
+                    <div style={{ ...GP.requestedBadge }}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                      Requested
+                    </div>
+                  ) : (
+                    <button
+                      style={GP.requestBtn}
+                      onClick={() => setActive(listing)}
+                    >
+                      Request
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
+
+const GP = {
+  panel: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    background: 'white', borderRadius: '18px 18px 0 0',
+    boxShadow: '0 -6px 32px rgba(0,0,0,0.15)',
+    zIndex: 650, display: 'flex', flexDirection: 'column',
+    maxHeight: '72%', animation: 'wlm-panelup .25s cubic-bezier(.34,1.2,.64,1)',
+  },
+  header: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '18px 18px 12px', borderBottom: '1px solid #f0f0f0', flexShrink: 0,
+  },
+  headerLeft: { display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 },
+  avatarDot: {
+    width: 38, height: 38, borderRadius: '50%',
+    background: 'linear-gradient(135deg, #1d4ed8 0%, #3b82f6 100%)',
+    flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+  name: { fontWeight: 700, fontSize: 14, color: '#1a1a1a', marginBottom: 2 },
+  sub: { fontSize: 12, color: '#999', display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  verifiedPill: {
+    background: '#e8f4ee', color: '#1a6b45', fontSize: 10, fontWeight: 600,
+    padding: '2px 7px', borderRadius: 20,
+  },
+  dirBtn: {
+    display: 'flex', alignItems: 'center', gap: 5,
+    background: '#f0faf5', color: '#1a6b45', border: '1.5px solid #c3e6d4',
+    borderRadius: 8, padding: '6px 11px', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+    flexShrink: 0,
+  },
+  closeBtn: {
+    width: 28, height: 28, borderRadius: '50%', background: '#f5f5f5',
+    border: 'none', cursor: 'pointer', color: '#888',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  listingsHeader: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    padding: '12px 18px 8px', flexShrink: 0,
+  },
+  listingsTitle: { fontSize: 12, fontWeight: 700, color: '#888', textTransform: 'uppercase', letterSpacing: '0.06em' },
+  listingsCount: {
+    fontSize: 11, fontWeight: 700, color: '#1a6b45',
+    background: '#e8f4ee', padding: '3px 9px', borderRadius: 20,
+  },
+  listingsBody: { overflowY: 'auto', flex: 1, padding: '0 12px 16px' },
+  center: { display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 16px' },
+  spinner: {
+    width: 20, height: 20, border: '2px solid #e0e0e0',
+    borderTop: '2px solid #1a6b45', borderRadius: '50%',
+    animation: 'wlm-spin .7s linear infinite',
+  },
+  listingCard: {
+    width: '100%', display: 'flex', alignItems: 'center', gap: 12,
+    padding: '11px 10px', background: 'none', border: 'none',
+    borderRadius: 10, textAlign: 'left',
+    transition: 'background 0.12s',
+  },
+  thumb: {
+    width: 48, height: 48, borderRadius: 10, flexShrink: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: 20,
+  },
+  listingInfo: { flex: 1, minWidth: 0 },
+  subtypePill: { fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 20 },
+  requestBtn: {
+    flexShrink: 0, padding: '7px 13px',
+    background: '#1a4731', color: 'white',
+    border: 'none', borderRadius: 8,
+    fontSize: 12, fontWeight: 600, cursor: 'pointer',
+    whiteSpace: 'nowrap',
+  },
+  requestedBadge: {
+    flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4,
+    padding: '7px 11px', background: '#f0fdf4',
+    color: '#15803d', border: '1px solid #86efac',
+    borderRadius: 8, fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
+  },
+  // Modal styles
+  modalOverlay: {
+    position: 'absolute', inset: 0,
+    background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(2px)',
+    zIndex: 10, display: 'flex', alignItems: 'flex-end',
+    borderRadius: '18px 18px 0 0',
+  },
+  modal: {
+    width: '100%', background: 'white',
+    borderRadius: '16px 16px 0 0',
+    padding: '20px 18px 24px',
+    boxShadow: '0 -4px 24px rgba(0,0,0,0.12)',
+    animation: 'wlm-panelup .2s ease',
+  },
+  modalHeader: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  modalTitle: { fontSize: 15, fontWeight: 700, color: '#1a1a1a' },
+};
+
+// ══════════════════════════════════════════════════════════════
+// FILTER PANEL
 // ══════════════════════════════════════════════════════════════
 function MyWasteFilterPanel({ selectedTypes, onChange, onClose }) {
   const toggle = t => onChange(selectedTypes.includes(t)?selectedTypes.filter(x=>x!==t):[...selectedTypes,t]);
@@ -303,7 +644,39 @@ const FP={
 // ══════════════════════════════════════════════════════════════
 // TRIP PANEL
 // ══════════════════════════════════════════════════════════════
-function TripPanel({stops,tripRoute,optimising,onOptimise,onRemoveStop,onClear,onClose}) {
+function TripPanel({ stops, tripRoute, optimising, onOptimise, onRemoveStop, onClear, onClose }) {
+  const stopsToShow = tripRoute?.orderedStops || stops;
+  
+  // Helper to get detailed location for trip stops
+  const getStopLocation = (stop) => {
+    // Try to get the most detailed location available
+    if (stop.address) {
+      // If address has comma, show first part (area) + city
+      const addressParts = stop.address.split(',');
+      if (addressParts.length >= 2) {
+        const area = addressParts[0].trim();
+        const city = addressParts[addressParts.length - 1].trim();
+        return `${area}, ${city}`;
+      }
+      return stop.address;
+    }
+    // Fallback to city
+    return stop.city || 'Location details not available';
+  };
+  
+  // Get full address for tooltip
+  const getFullAddress = (stop) => {
+    if (stop.address) return stop.address;
+    if (stop.city) return stop.city;
+    return 'Address not available';
+  };
+  
+  // Handle close - clear everything and close panel
+  const handleClose = () => {
+    onClear();  // Clear all trip data and route
+    onClose();  // Close the panel
+  };
+  
   return (
     <div style={TP.panel}>
       <div style={TP.header}>
@@ -312,42 +685,61 @@ function TripPanel({stops,tripRoute,optimising,onOptimise,onRemoveStop,onClear,o
             🗺️ My Recycling Trip
             <span style={TP.stopCount}>{stops.length}/{MAX_TRIP_STOPS}</span>
           </p>
-          {tripRoute&&(
-            <div style={{display:'flex',gap:12,marginTop:4}}>
+          {tripRoute && (
+            <div style={{ display: 'flex', gap: 12, marginTop: 4 }}>
               <span style={TP.stat}>⏱ {fmtDur(tripRoute.duration)}</span>
               <span style={TP.stat}>📍 {fmtDist(tripRoute.distance)}</span>
             </div>
           )}
         </div>
-        <button style={TP.closeBtn} onClick={onClose}>✕</button>
+        <button style={TP.closeBtn} onClick={handleClose}>✕</button>
       </div>
       <div style={TP.stopList}>
-        {(tripRoute?.orderedStops||stops).map((stop,i)=>(
+        {stopsToShow.map((stop, i) => (
           <div key={stop.id} style={TP.stopRow}>
-            <div style={{...TP.stopNum,background:tripRoute?'#f59e0b':'#1a4731'}}>{tripRoute?i+1:'·'}</div>
-            <div style={{flex:1,minWidth:0}}>
-              <p style={TP.stopName}>{stop.name}</p>
-              <p style={TP.stopCity}>{stop.city||stop.address||''}</p>
+            <div style={{ ...TP.stopNum, background: tripRoute ? '#f59e0b' : '#1a4731' }}>
+              {tripRoute ? i + 1 : '·'}
             </div>
-            {!tripRoute&&<button style={TP.removeBtn} onClick={()=>onRemoveStop(stop.id)}>✕</button>}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={TP.stopName}>{stop.name}</p>
+              <p 
+                style={TP.stopCity}
+                title={getFullAddress(stop)}
+              >
+                📍 {getStopLocation(stop)}
+              </p>
+            </div>
+            {!tripRoute && (
+              <button style={TP.removeBtn} onClick={() => onRemoveStop(stop.id)}>✕</button>
+            )}
           </div>
         ))}
       </div>
       <div style={TP.footer}>
-        {!tripRoute?(
+        {!tripRoute ? (
           <>
             <button style={TP.clearBtn} onClick={onClear}>Clear</button>
-            <button style={{...TP.optimiseBtn,opacity:stops.length<2?0.5:1}} disabled={stops.length<2||optimising} onClick={onOptimise}>
-              {optimising?<><span style={TP.spinner}/>Optimising…</>:<>✨ Optimise Route</>}
+            <button 
+              style={{ ...TP.optimiseBtn, opacity: stops.length < 2 ? 0.5 : 1 }} 
+              disabled={stops.length < 2 || optimising} 
+              onClick={onOptimise}
+            >
+              {optimising ? (
+                <><span style={TP.spinner} />Optimising…</>
+              ) : (
+                <>✨ Optimise Route</>
+              )}
             </button>
           </>
-        ):(
-          <button style={TP.newTripBtn} onClick={onClear}>← Plan new trip</button>
+        ) : (
+          <button style={TP.newTripBtn} onClick={handleClose}>← Plan new trip</button>
         )}
       </div>
     </div>
   );
 }
+
+
 const TP={
   panel:{position:'absolute',bottom:0,left:0,right:0,background:'white',borderRadius:'16px 16px 0 0',boxShadow:'0 -4px 24px rgba(0,0,0,0.14)',zIndex:650,display:'flex',flexDirection:'column',maxHeight:'60%',animation:'wlm-panelup .25s ease'},
   header:{display:'flex',alignItems:'flex-start',justifyContent:'space-between',padding:'16px 18px 10px',borderBottom:'1px solid #f0f0f0',flexShrink:0},
@@ -366,9 +758,9 @@ const TP={
   optimiseBtn:{flex:1,padding:'10px',background:'#f59e0b',color:'white',border:'none',borderRadius:10,fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',gap:6},
   newTripBtn:{flex:1,padding:'10px',background:'#f0faf5',color:'#1a4731',border:'1.5px solid #c3e6d4',borderRadius:10,fontSize:13,fontWeight:600,cursor:'pointer'},
   spinner:{width:12,height:12,border:'2px solid rgba(255,255,255,0.3)',borderTop:'2px solid white',borderRadius:'50%',animation:'wlm-spin .7s linear infinite',flexShrink:0},
+ 
 };
 
-// ─── Route Panel ──────────────────────────────────────────────
 function RoutePanel({route,destination,onClose}) {
   if(!route) return null;
   const stepIcon=(type,mod)=>{
@@ -461,6 +853,25 @@ export default function MapModule({user,onNavigate}) {
   const [routeLoading,setRouteLoading]=useState(false);
   const [showRoutePanel,setShowRoutePanel]=useState(false);
 
+  // ── NEW: generator listings panel state ──────────────────────
+  const [showGeneratorPanel, setShowGeneratorPanel] = useState(false);
+  const [generatorLoc, setGeneratorLoc] = useState(null);
+ 
+
+  const handleMarkerClick = useCallback((loc) => {
+  setSelected(loc);
+  if (role === 'recycler' && loc.location_type === 'waste_generator') {
+    setGeneratorLoc(loc);
+    setShowGeneratorPanel(true);
+    setShowRoutePanel(false);
+    setShowTripPanel(false);
+  } else {
+    setShowGeneratorPanel(false);
+    setGeneratorLoc(null);
+  }
+  if (mobileView !== 'map') setMobileView('map');
+}, [role, mobileView]); // ← Add dependencies used inside
+
   // ── Filtered + scored ────────────────────────────────────────
   const filtered=locations
     .filter(loc=>{
@@ -517,9 +928,9 @@ export default function MapModule({user,onNavigate}) {
     markersRef.current.forEach(m=>map.removeLayer(m));
     markersRef.current=[];
     sorted.forEach(loc=>{
-      const icon=L.icon({iconUrl:makeSvgIcon(loc.location_type),iconSize:[28,36], iconAnchor:[14,36], popupAnchor:[0,-38]});
+      const icon=L.icon({iconUrl:makeSvgIcon(loc.location_type),iconSize:[28,36],iconAnchor:[14,36],popupAnchor:[0,-38]});
       const marker=L.marker([loc.lat,loc.lng],{icon})
-        .on('click',()=>{setSelected(loc);if(mobileView!=='map')setMobileView('map');})
+        .on('click',()=>handleMarkerClick(loc))
         .addTo(map);
       marker.bindTooltip(
         `<div style="font-weight:600;font-size:12px">${loc.name}</div><div style="font-size:11px;color:#bbb;margin-top:2px">${PIN_LABELS[loc.location_type]||''}</div>`,
@@ -527,18 +938,19 @@ export default function MapModule({user,onNavigate}) {
       );
       markersRef.current.push(marker);
     });
-  },[sorted,mapReady]);
-
+  },[sorted,mapReady,handleMarkerClick]);
+   
   // ── User dot ─────────────────────────────────────────────────
   useEffect(()=>{
     if(!mapReady||!mapInstance.current||!window.L||!userPos) return;
+
     const L=window.L,map=mapInstance.current;
     if(userDotRef.current){map.removeLayer(userDotRef.current);userDotRef.current=null;}
     const dotIcon=L.icon({iconUrl:makeUserDotIcon(),iconSize:[24,24],iconAnchor:[12,12]});
     userDotRef.current=L.marker(userPos,{icon:dotIcon,zIndexOffset:1000})
       .bindTooltip('You are here',{direction:'top',className:'wlm-tooltip'})
       .addTo(map);
-  },[userPos,mapReady]);
+  },[userPos,mapReady,handleMarkerClick]);
 
   // ── Single route ─────────────────────────────────────────────
   const drawRoute=geojson=>{
@@ -591,70 +1003,132 @@ export default function MapModule({user,onNavigate}) {
     if(tripLayerRef.current&&mapInstance.current){mapInstance.current.removeLayer(tripLayerRef.current);tripLayerRef.current=null;}
   };
 
-  // FIX: use L.featureGroup() not L.layerGroup() — featureGroup has getBounds()
-  const drawTripRoute=(geojson,orderedStops)=>{
-    if(!mapInstance.current||!window.L) return;
-    const L=window.L,map=mapInstance.current;
-    if(tripLayerRef.current){map.removeLayer(tripLayerRef.current);tripLayerRef.current=null;}
-    const group=L.featureGroup(); // ← KEY FIX
-    L.geoJSON(geojson,{
-      style:{color:'#f59e0b',weight:5,opacity:0.9,lineCap:'round',lineJoin:'round',dashArray:'8 4'}
-    }).addTo(group);
-    orderedStops.forEach((stop,i)=>{
-      const icon=L.icon({iconUrl:makeNumberedPin(i+1,'#f59e0b'),iconSize:[36,48],iconAnchor:[18,48]});
-      L.marker([stop.lat,stop.lng],{icon})
-        .bindTooltip(`Stop ${i+1}: ${stop.name}`,{direction:'top',className:'wlm-tooltip'})
-        .addTo(group);
-    });
-    tripLayerRef.current=group.addTo(map);
-    map.fitBounds(group.getBounds(),{padding:[50,50],animate:true}); // now works
-  };
-
-  const runOptimisation=async pos=>{
-    setTripOptimising(true);
-    try {
-      const result=await optimiseTripRoute(pos,tripStops);
-      setTripRoute(result);
-      drawTripRoute(result.geometry,result.orderedStops);
-      setMobileView('map');
-    } catch(e){alert('Could not optimise route: '+e.message);}
-    finally{setTripOptimising(false);}
-  };
-  const handleOptimiseTrip=async()=>{
-    if(!userPos){
-      navigator.geolocation?.getCurrentPosition(
-        async({coords:{latitude:lat,longitude:lng}})=>{setUserPos([lat,lng]);await runOptimisation([lat,lng]);},
-        ()=>alert('Enable location access to optimise route.')
-      );return;
+  const drawTripRoute = (geojson, orderedStops) => {
+  if (!mapInstance.current || !window.L) return;
+  const L = window.L;
+  const map = mapInstance.current;
+  
+  // Clear previous route layer
+  if (tripLayerRef.current) {
+    map.removeLayer(tripLayerRef.current);
+    tripLayerRef.current = null;
+  }
+  
+  const group = L.featureGroup();
+  
+  // Add the route line (thicker, more visible for multi-stop routes)
+  L.geoJSON(geojson, {
+    style: {
+      color: '#f59e0b',
+      weight: 6,
+      opacity: 0.9,
+      lineCap: 'round',
+      lineJoin: 'round'
     }
-    await runOptimisation(userPos);
-  };
+  }).addTo(group);
+  
+  // Add numbered markers for each stop in optimized order
+  orderedStops.forEach((stop, i) => {
+    const icon = L.icon({
+      iconUrl: makeNumberedPin(i + 1, '#f59e0b'),
+      iconSize: [36, 48],
+      iconAnchor: [18, 48]
+    });
+    
+    L.marker([stop.lat, stop.lng], { icon })
+      .bindTooltip(`Stop ${i + 1}: ${stop.name}\n${(stop.distance?.toFixed(1) || '?')} km from previous`, {
+        direction: 'top',
+        className: 'wlm-tooltip'
+      })
+      .addTo(group);
+  });
+  
+  // Add a marker for the starting point (user location)
+  if (userPos) {
+    const startIcon = L.icon({
+      iconUrl: makeUserDotIcon(),
+      iconSize: [24, 24],
+      iconAnchor: [12, 12]
+    });
+    L.marker([userPos[0], userPos[1]], { icon: startIcon })
+      .bindTooltip('Your starting point', { direction: 'top', className: 'wlm-tooltip' })
+      .addTo(group);
+  }
+  
+  tripLayerRef.current = group.addTo(map);
+  
+  // Fit bounds with padding
+  map.fitBounds(group.getBounds(), { padding: [50, 50], animate: true });
+};
 
-  // ── Use My Location — FIX: also pan map to nearest location ──
+  const runOptimisation = async (pos) => {
+  if (tripStops.length < 2) {
+    alert("Add at least 2 stops to optimize your route");
+    return;
+  }
+  
+  setTripOptimising(true);
+  try {
+    const result = await optimiseTripRoute(pos, tripStops);
+    if (result && result.orderedStops) {
+      setTripRoute(result);
+      drawTripRoute(result.geometry, result.orderedStops);
+      setMobileView('map');
+      // Show success message
+      console.log(`Route optimized with ${result.orderedStops.length} stops, distance: ${(result.distance/1000).toFixed(1)}km`);
+    } else {
+      alert('Could not optimise route. Please try again.');
+    }
+  } catch(e) {
+    console.error('Route optimisation error:', e);
+    alert('Could not optimise route: ' + e.message);
+  } finally {
+    setTripOptimising(false);
+  }
+};
+
+const handleOptimiseTrip = async () => {
+  if (tripStops.length < 2) {
+    alert("Add at least 2 recycling locations to optimize your trip");
+    return;
+  }
+  
+  if (!userPos) {
+    // Get user location first
+    if (!navigator.geolocation) {
+      alert('Geolocation not supported. Please enable location access.');
+      return;
+    }
+    
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords: { latitude: lat, longitude: lng } }) => {
+        setUserPos([lat, lng]);
+        await runOptimisation([lat, lng]);
+      },
+      (err) => {
+        console.error('Geolocation error:', err);
+        alert('Enable location access to optimise route or use a starting point.');
+      },
+      { enableHighAccuracy: true }
+    );
+    return;
+  }
+  
+  await runOptimisation(userPos);
+};
   const handleUseMyLocation=()=>{
     if(!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
       ({coords:{latitude:lat,longitude:lng}})=>{
         setUserPos([lat,lng]);
         if(!mapInstance.current) return;
-
-        // Pan to user first
         mapInstance.current.setView([lat,lng],13,{animate:true});
-
-        // Then after sorted re-renders, fit map to show user + nearest 3 locations
         setTimeout(()=>{
           if(!mapInstance.current||!window.L) return;
-          const nearby=locations
-            .map(l=>({...l,d:distKm(lat,lng,l.lat,l.lng)}))
-            .sort((a,b)=>a.d-b.d)
-            .slice(0,3);
+          const nearby=locations.map(l=>({...l,d:distKm(lat,lng,l.lat,l.lng)})).sort((a,b)=>a.d-b.d).slice(0,3);
           if(nearby.length===0) return;
           const L=window.L;
-          // FIX: use featureGroup to get bounds of user + nearby pins
-          const fg=L.featureGroup([
-            L.marker([lat,lng]),
-            ...nearby.map(l=>L.marker([l.lat,l.lng])),
-          ]);
+          const fg=L.featureGroup([L.marker([lat,lng]),...nearby.map(l=>L.marker([l.lat,l.lng]))]);
           mapInstance.current.fitBounds(fg.getBounds(),{padding:[60,60],maxZoom:14,animate:true});
         },300);
       },
@@ -684,11 +1158,16 @@ export default function MapModule({user,onNavigate}) {
   const handleSidebarClick=loc=>{
     setSelected(loc);
     if(mapInstance.current)mapInstance.current.setView([loc.lat,loc.lng],15,{animate:true});
+    if(role==='recycler'&&loc.location_type==='waste_generator'){
+      setGeneratorLoc(loc);
+      setShowGeneratorPanel(true);
+      setMobileView('map');
+    }
   };
   const handleHeaderAction=()=>{if(onNavigate)onNavigate(role==='recycler'?'profile':'listWaste');};
 
   const pageTitle=role==='recycler'?'Find Waste Generators':'Find Recyclers';
-  const pageSubtitle=role==='recycler'?'Discover waste sellers with active listings near you':'Discover recycling centres and collection points across Kenya';
+  const pageSubtitle=role==='recycler'?'Tap a generator pin to browse their available waste listings':'Discover recycling centres and collection points across Kenya';
   const countLabel=role==='recycler'?'Generators':'Recycling Centres';
 
   return(
@@ -770,6 +1249,19 @@ export default function MapModule({user,onNavigate}) {
             </div>
           )}
 
+          {/* Recycler hint */}
+          {role==='recycler'&&(
+            <div style={{
+              margin:'0 14px 12px',padding:'10px 14px',
+              background:'#eff6ff',border:'1px solid #bfdbfe',
+              borderRadius:10,fontSize:12,color:'#1e40af',
+              display:'flex',alignItems:'center',gap:8,
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1e40af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+              Tap any generator pin on the map to browse their waste listings
+            </div>
+          )}
+
           {tripStops.length>0&&(
             <button style={S.tripBannerBtn} onClick={()=>setShowTripPanel(true)}>
               <span>🗺️ Trip: {tripStops.length} stop{tripStops.length>1?'s':''}</span>
@@ -818,9 +1310,24 @@ export default function MapModule({user,onNavigate}) {
           {(routeData&&!routeLoading)||(tripRoute)?(
             <button style={S.clearRouteBtn} onClick={()=>{clearRoute();clearTrip();}}>✕ Clear Route</button>
           ):null}
+
+          {/* Generator listings panel — shown for recyclers clicking a waste generator */}
+          {role==='recycler'&&showGeneratorPanel&&generatorLoc&&!showRoutePanel&&!showTripPanel&&(
+            <GeneratorListingsPanel
+              loc={generatorLoc}
+              onClose={()=>{setShowGeneratorPanel(false);setGeneratorLoc(null);setSelected(null);}}
+              onGetDirections={(loc)=>{
+                setShowGeneratorPanel(false);
+                handleGetDirections(loc);
+              }}
+            />
+          )}
+
           {showRoutePanel&&routeData&&<RoutePanel route={routeData} destination={routeData.destinationName} onClose={()=>setShowRoutePanel(false)}/>}
           {showTripPanel&&<TripPanel stops={tripStops} tripRoute={tripRoute} optimising={tripOptimising} onOptimise={handleOptimiseTrip} onRemoveStop={removeFromTrip} onClear={clearTrip} onClose={()=>setShowTripPanel(false)}/>}
-          {selected&&!showRoutePanel&&!showTripPanel&&(
+
+          {/* Standard detail card — shown for non-generators or non-recycler role */}
+          {selected&&!showRoutePanel&&!showTripPanel&&!(role==='recycler'&&selected.location_type==='waste_generator')&&(
             <div className="wlm-detail-card" style={S.detailCard}>
               <button style={S.detailClose} onClick={()=>setSelected(null)}>✕</button>
               <div style={S.detailBadges}>
@@ -889,6 +1396,7 @@ function LocationCard({loc,userPos,selected,inTrip,selectedWasteTypes,role,onCli
   const dist=userPos?distKm(userPos[0],userPos[1],loc.lat,loc.lng):null;
   const rating=loc.users?.rating??null;
   const isCP=loc.location_type==='collection_point';
+  const isWG=loc.location_type==='waste_generator';
   const showMatch=selectedWasteTypes.length>0&&loc._matchScore!==undefined;
   const matchPct=showMatch?loc._matchScore/loc._matchTotal:0;
   const matchColor=matchPct===1?'#1a4731':matchPct>=0.5?'#e07b2a':'#aaa';
@@ -897,8 +1405,10 @@ function LocationCard({loc,userPos,selected,inTrip,selectedWasteTypes,role,onCli
     <div style={{borderBottom:'1px solid #f5f5f5'}}>
       <button onClick={onClick} style={{...S.card,...(selected?S.cardActive:{})}}>
         <div style={S.cardRow}>
-          <div style={{...S.avatarCircle,background:isCP?'#fff3e0':'#e8f4ee'}}>
-            {isCP
+          <div style={{...S.avatarCircle,background:isWG?'#eff6ff':isCP?'#fff3e0':'#e8f4ee'}}>
+            {isWG
+              ?<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1d4ed8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9h18v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Z"/><path d="m3 9 2.45-4.9A2 2 0 0 1 7.24 3h9.52a2 2 0 0 1 1.8 1.1L21 9"/><path d="M12 3v6"/></svg>
+              :isCP
               ?<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#e07b2a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12H19M12 5l7 7-7 7"/></svg>
               :<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#1a4731" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="1 4 1 10 7 10"/><polyline points="23 20 23 14 17 14"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
             }
@@ -907,6 +1417,10 @@ function LocationCard({loc,userPos,selected,inTrip,selectedWasteTypes,role,onCli
             <div style={{display:'flex',alignItems:'center',gap:6}}>
               <p style={S.cardName}>{loc.name}</p>
               {inTrip&&<span style={{color:'#f59e0b',fontSize:10,flexShrink:0}}>●</span>}
+              {/* Recycler: show "View listings →" hint */}
+              {role==='recycler'&&isWG&&(
+                <span style={{fontSize:10,color:'#1d4ed8',fontWeight:600,flexShrink:0,marginLeft:'auto'}}>View listings →</span>
+              )}
             </div>
             <p style={S.cardSub}>{loc.address||loc.city||''}{loc.operating_hours?` · ${formatHours(loc.operating_hours)}`:''}</p>
             {rating!==null&&(
@@ -932,7 +1446,7 @@ function LocationCard({loc,userPos,selected,inTrip,selectedWasteTypes,role,onCli
           </div>
         )}
       </button>
-      {selected&&(
+      {selected&&!(role==='recycler'&&isWG)&&(
         <div style={{padding:'0 6px 10px 50px',display:'flex',gap:6,flexWrap:'wrap'}}>
           <button style={S.cardDirBtn} onClick={e=>{e.stopPropagation();onDirections();}}>🗺️ Directions</button>
           {role!=='recycler'&&(inTrip
@@ -1016,4 +1530,5 @@ const S={
   routeSteps:{overflowY:'auto',padding:'8px 0 16px'},
   routeStep:{display:'flex',alignItems:'flex-start',gap:10,padding:'8px 18px'},
   routeStepIcon:{width:26,height:26,borderRadius:'50%',background:'#f0faf5',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,flexShrink:0},
+
 };

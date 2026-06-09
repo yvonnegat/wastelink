@@ -4,6 +4,7 @@ import { notificationsService } from '../../services/index';
 
 const TYPE_ICON = {
   match_found:        { name: 'recycle', color: '#5A8A5A' },
+  match_request:      { name: 'recycle', color: '#5A8A5A' },
   transaction_update: { name: 'txn',    color: '#6B7C45' },
   listing_verified:   { name: 'check',  color: '#2A6A2A' },
   system:             { name: 'info',   color: '#6B7C45' },
@@ -20,10 +21,10 @@ function timeAgo(iso) {
 }
 
 export default function NotificationPanel() {
-  const [open, setOpen]         = useState(false);
-  const [notifs, setNotifs]     = useState([]);
-  const [unread, setUnread]     = useState(0);
-  const [loading, setLoading]   = useState(false);
+  const [open, setOpen]       = useState(false);
+  const [notifs, setNotifs]   = useState([]);
+  const [unread, setUnread]   = useState(0);
+  const [loading, setLoading] = useState(false);
   const panelRef = useRef();
 
   const fetchUnreadCount = useCallback(async () => {
@@ -43,14 +44,12 @@ export default function NotificationPanel() {
     }
   }, []);
 
-  // Poll unread count every 60 seconds
   useEffect(() => {
     fetchUnreadCount();
     const interval = setInterval(fetchUnreadCount, 60000);
     return () => clearInterval(interval);
   }, [fetchUnreadCount]);
 
-  // Load notifications when panel opens
   useEffect(() => {
     if (open) fetchNotifs();
   }, [open, fetchNotifs]);
@@ -64,11 +63,11 @@ export default function NotificationPanel() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  async function handleMarkRead(id, e) {
-    e.stopPropagation();
+  async function handleMarkRead(id) {
     try {
       await notificationsService.markRead(id);
-      setNotifs(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+      // Remove the notification from the list immediately — clean and satisfying
+      setNotifs(prev => prev.filter(n => n.id !== id));
       setUnread(prev => Math.max(0, prev - 1));
     } catch { /* ignore */ }
   }
@@ -92,6 +91,8 @@ export default function NotificationPanel() {
   }
 
   return (
+    // Wrapper uses a portal-like approach: fixed positioning on the panel
+    // so no parent overflow:hidden or z-index can clip it
     <div style={{ position: 'relative' }} ref={panelRef}>
       {/* Bell button */}
       <button
@@ -115,32 +116,61 @@ export default function NotificationPanel() {
         )}
       </button>
 
-      {/* Dropdown panel */}
+      {/* Dropdown — uses fixed positioning so it escapes any parent overflow/z-index */}
       {open && (
         <div style={{
-          position: 'absolute', top: '100%', right: 0, marginTop: 8,
-          width: 360, maxHeight: 480,
-          background: 'var(--white)', borderRadius: 'var(--r)',
-          border: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)',
-          zIndex: 200, display: 'flex', flexDirection: 'column',
+          position: 'fixed',
+          // Position it below the topbar — adjust top value to match your topbar height
+          top: 56,
+          right: 16,
+          width: 360,
+          maxHeight: 'calc(100vh - 80px)',
+          background: 'var(--white)',
+          borderRadius: 'var(--r)',
+          border: '1px solid var(--border)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.08)',
+          // High z-index — above topbar, sidebar, map, everything
+          zIndex: 99999,
+          display: 'flex',
+          flexDirection: 'column',
           overflow: 'hidden',
         }}>
           {/* Header */}
-          <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+          <div style={{
+            padding: '14px 16px',
+            borderBottom: '1px solid var(--border)',
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            flexShrink: 0,
+          }}>
             <div style={{ fontWeight: 600, fontSize: 14 }}>
-              Notifications {unread > 0 && <span style={{ color: 'var(--olive)', fontSize: 12, fontWeight: 400 }}>({unread} unread)</span>}
+              Notifications{' '}
+              {unread > 0 && (
+                <span style={{ color: 'var(--olive)', fontSize: 12, fontWeight: 400 }}>
+                  ({unread} unread)
+                </span>
+              )}
             </div>
-            {unread > 0 && (
-              <button className="link-btn" style={{ fontSize: 12 }} onClick={handleMarkAllRead}>
-                Mark all read
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {unread > 0 && (
+                <button className="link-btn" style={{ fontSize: 12 }} onClick={handleMarkAllRead}>
+                  Mark all read
+                </button>
+              )}
+              <button
+                onClick={() => setOpen(false)}
+                style={{ background: '#f5f5f5', border: 'none', width: 24, height: 24, borderRadius: '50%', cursor: 'pointer', color: '#888', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Icon name="x" size={12} />
               </button>
-            )}
+            </div>
           </div>
 
           {/* List */}
           <div style={{ overflowY: 'auto', flex: 1 }}>
             {loading ? (
-              <div style={{ padding: 24, textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>Loading…</div>
+              <div style={{ padding: 24, textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>
+                Loading…
+              </div>
             ) : notifs.length === 0 ? (
               <div style={{ padding: 32, textAlign: 'center', color: 'var(--text3)', fontSize: 13 }}>
                 <Icon name="bell" size={24} color="var(--border)" style={{ marginBottom: 8 }} />
@@ -150,27 +180,63 @@ export default function NotificationPanel() {
               notifs.map(n => {
                 const ic = TYPE_ICON[n.type] || TYPE_ICON.system;
                 return (
-                  <div key={n.id} style={{
-                    padding: '12px 16px',
-                    borderBottom: '1px solid var(--border)',
-                    background: n.is_read ? 'transparent' : 'var(--olive-bg)',
-                    display: 'flex', gap: 10, alignItems: 'flex-start',
-                  }}>
-                    <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--olive-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <div
+                    key={n.id}
+                    style={{
+                      padding: '12px 16px',
+                      borderBottom: '1px solid var(--border)',
+                      background: n.is_read ? 'transparent' : 'var(--olive-bg)',
+                      display: 'flex', gap: 10, alignItems: 'flex-start',
+                      transition: 'background 0.2s',
+                    }}
+                  >
+                    {/* Icon */}
+                    <div style={{
+                      width: 34, height: 34, borderRadius: '50%',
+                      background: n.is_read ? '#f5f5f5' : 'var(--olive-muted)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0,
+                    }}>
                       <Icon name={ic.name} size={15} color={ic.color} />
                     </div>
+
+                    {/* Content */}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>{n.title}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.4 }}>{n.body}</div>
-                      <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>{timeAgo(n.created_at)}</div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>
+                        {n.title}
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.4 }}>
+                        {n.body}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>
+                        {timeAgo(n.created_at)}
+                      </div>
                     </div>
+
+                    {/* Actions */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flexShrink: 0 }}>
                       {!n.is_read && (
-                        <button onClick={e => handleMarkRead(n.id, e)} title="Mark read" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--olive)', padding: 2 }}>
+                        <button
+                          onClick={() => handleMarkRead(n.id)}
+                          title="Mark as read"
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            color: 'var(--olive)', padding: 2,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          }}
+                        >
                           <Icon name="check" size={13} />
                         </button>
                       )}
-                      <button onClick={e => handleDelete(n.id, e)} title="Delete" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: 2 }}>
+                      <button
+                        onClick={e => handleDelete(n.id, e)}
+                        title="Delete"
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          color: 'var(--text3)', padding: 2,
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}
+                      >
                         <Icon name="x" size={13} />
                       </button>
                     </div>

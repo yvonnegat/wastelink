@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { WASTE_TYPES } from '../../data/mockData';
 import { Button, StepIndicator, Alert } from '../common';
 import Icon from '../common/Icon';
@@ -223,13 +223,19 @@ export default function WasteListing({ onNavigate }) {
   const [drag, setDrag] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [distanceKm, setDistanceKm] = useState(5);
   const fileRef = useRef();
 
+  const [visionResult, setVisionResult] = useState(null);
+  const [visionLoading, setVisionLoading] = useState(false);
   const selectedType = wasteTypeArray.find(w => w.label === wasteType);
   const quantityNum = parseFloat(qty) || 0;
 
+  
+
   const GEOAPIFY_KEY = process.env?.REACT_APP_GEOAPIFY_KEY;
-  const fileRef = useRef();
+ 
 
   // ── Validation helpers ────────────────────────────────────────────────
   const setFieldError = (field, msg) =>
@@ -448,6 +454,21 @@ export default function WasteListing({ onNavigate }) {
       setLoading(false);
     }
   }
+  const handleConfirmSubmit = async () => {
+  setLoading(true);
+  try {
+    await listingsService.submit(createdListing.id);
+    setStep(4);
+  } catch (e) {
+    addToast({
+      type: 'error',
+      title: 'Submission Failed',
+      message: e.message || 'Please try again.'
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
   function reset() {
     setStep(1); setWasteType(''); setSubtype(''); setQty('');
@@ -856,7 +877,7 @@ export default function WasteListing({ onNavigate }) {
       </div>
     </div>
   );
-};
+
 
   const renderDoneStep = () => (
     <div className="card" style={{ textAlign: 'center', padding: '40px 24px' }}>
@@ -896,3 +917,4 @@ export default function WasteListing({ onNavigate }) {
       </div>
     </>
   );
+}
