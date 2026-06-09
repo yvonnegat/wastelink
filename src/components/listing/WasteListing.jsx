@@ -11,7 +11,7 @@ import {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const STEPS = ['Details', 'Verify', 'Price', 'Done'];  // Changed order: Verify before Price
+const STEPS = ['Details', 'Verify', 'Price', 'Done'];
 
 const CONDITIONS = [
   { label: 'Clean / Sorted', value: 'clean' },
@@ -78,20 +78,20 @@ const SvgIcon = ({ d, size = 20, color = 'currentColor', strokeWidth = 1.75, vie
 );
 
 const Icons = {
-  MapPin:       () => <SvgIcon size={16} d={["M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z", "M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0-6 0"]} />,
-  Crosshair:    () => <SvgIcon size={16} d={["M12 2v4", "M12 18v4", "M2 12h4", "M18 12h4", "M12 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0-6 0"]} />,
-  CheckCircle:  () => <SvgIcon size={20} d={["M22 11.08V12a10 10 0 1 1-5.93-9.14", "M22 4L12 14.01l-3-3"]} color="#22a855" />,
-  XCircle:      () => <SvgIcon size={20} d={["M22 12A10 10 0 1 1 2 12a10 10 0 0 1 20 0", "M15 9l-6 6", "M9 9l6 6"]} color="#e05050" />,
-  AlertTriangle:() => <SvgIcon size={20} d={["M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z", "M12 9v4", "M12 17h.01"]} color="#f59e0b" />,
-  Info:         () => <SvgIcon size={20} d={["M12 22A10 10 0 1 0 12 2a10 10 0 0 0 0 20z", "M12 16v-4", "M12 8h.01"]} color="#3b82f6" />,
-  X:            () => <SvgIcon size={14} d="M18 6L6 18M6 6l12 12" strokeWidth={2.5} />,
-  Camera:       () => <SvgIcon size={28} d={["M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z", "M12 17A4 4 0 1 0 12 9a4 4 0 0 0 0 8z"]} color="#2A6A2A" />,
-  Building2:    () => <SvgIcon size={18} d={["M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18z", "M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2", "M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2", "M10 6h4", "M10 10h4", "M10 14h4", "M10 18h4"]} />,
-  Factory:      () => <SvgIcon size={18} d={["M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v16z", "M17 18h1", "M12 18h1", "M7 18h1"]} />,
-  Home:         () => <SvgIcon size={18} d={["M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z", "M9 22V12h6v10"]} />,
-  TrendingUp:   () => <SvgIcon size={16} d="M23 6l-9.5 9.5-5-5L1 18" />,
-  Loader:       () => <SvgIcon size={16} d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />,
-  Sparkles:     () => <SvgIcon size={14} d={["M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z", "M5 17l.75 2.25L8 20l-2.25.75L5 23l-.75-2.25L2 20l2.25-.75L5 17z"]} />,
+  MapPin:        () => <SvgIcon size={16} d={["M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z", "M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0-6 0"]} />,
+  Crosshair:     () => <SvgIcon size={16} d={["M12 2v4", "M12 18v4", "M2 12h4", "M18 12h4", "M12 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0-6 0"]} />,
+  CheckCircle:   () => <SvgIcon size={20} d={["M22 11.08V12a10 10 0 1 1-5.93-9.14", "M22 4L12 14.01l-3-3"]} color="#22a855" />,
+  XCircle:       () => <SvgIcon size={20} d={["M22 12A10 10 0 1 1 2 12a10 10 0 0 1 20 0", "M15 9l-6 6", "M9 9l6 6"]} color="#e05050" />,
+  AlertTriangle: () => <SvgIcon size={20} d={["M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0-3.42 0z", "M12 9v4", "M12 17h.01"]} color="#f59e0b" />,
+  Info:          () => <SvgIcon size={20} d={["M12 22A10 10 0 1 0 12 2a10 10 0 0 0 0 20z", "M12 16v-4", "M12 8h.01"]} color="#3b82f6" />,
+  X:             () => <SvgIcon size={14} d="M18 6L6 18M6 6l12 12" strokeWidth={2.5} />,
+  Camera:        () => <SvgIcon size={28} d={["M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z", "M12 17A4 4 0 1 0 12 9a4 4 0 0 0 0 8z"]} color="#2A6A2A" />,
+  Building2:     () => <SvgIcon size={18} d={["M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18z", "M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2", "M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2", "M10 6h4", "M10 10h4", "M10 14h4", "M10 18h4"]} />,
+  Factory:       () => <SvgIcon size={18} d={["M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v16z", "M17 18h1", "M12 18h1", "M7 18h1"]} />,
+  Home:          () => <SvgIcon size={18} d={["M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z", "M9 22V12h6v10"]} />,
+  TrendingUp:    () => <SvgIcon size={16} d="M23 6l-9.5 9.5-5-5L1 18" />,
+  Loader:        () => <SvgIcon size={16} d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />,
+  Sparkles:      () => <SvgIcon size={14} d={["M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z", "M5 17l.75 2.25L8 20l-2.25.75L5 23l-.75-2.25L2 20l2.25-.75L5 17z"]} />,
 };
 
 const CollectionIcons = { commercial: Icons.Building2, industrial: Icons.Factory, household: Icons.Home };
@@ -186,7 +186,6 @@ function FieldError({ message }) {
 export default function WasteListing({ onNavigate }) {
   const wasteTypeArray = useMemo(() => buildWasteTypeArray(WASTE_TYPES), []);
 
-  // Step state - NEW ORDER: Details (1), Verify (2), Price (3), Done (4)
   const [step, setStep] = useState(1);
   const [wasteType, setWasteType] = useState('');
   const [subtype, setSubtype] = useState('');
@@ -219,7 +218,7 @@ export default function WasteListing({ onNavigate }) {
   const [drag, setDrag] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Vision (team's CV verification)
+  // Vision
   const {
     result: visionResult,
     loading: visionLoading,
@@ -228,7 +227,6 @@ export default function WasteListing({ onNavigate }) {
     clear: clearVision,
   } = useVision();
 
-  // Inline field errors
   const [fieldErrors, setFieldErrors] = useState({});
 
   const selectedType = wasteTypeArray.find(w => w.label === wasteType);
@@ -262,6 +260,7 @@ export default function WasteListing({ onNavigate }) {
 
   const fetchSuggestions = async (text) => {
     if (!text || text.length < 3) { setSuggestions([]); return; }
+    if (!GEOAPIFY_KEY) return; // ✅ guard: don't call API without key
     setLoadingSuggestions(true);
     try {
       const res = await fetch(
@@ -319,7 +318,7 @@ export default function WasteListing({ onNavigate }) {
     );
   };
 
-  // ── Step 1: Create listing (without price) ────────────────────────────────
+  // ── Step 1: Create listing ────────────────────────────────────────────
 
   async function handleCreateListing() {
     const errors = {};
@@ -351,6 +350,7 @@ export default function WasteListing({ onNavigate }) {
         collection_point: collectionPoint,
         county,
         location: location || `${county}, Kenya`,
+        notes, // ✅ included so seller notes are saved
         ...(lat && { lat }),
         ...(lng && { lng }),
       };
@@ -359,7 +359,7 @@ export default function WasteListing({ onNavigate }) {
       console.log('✅ Listing created:', listing);
       setCreatedListing(listing);
       addToast({ type: 'success', title: 'Details Saved', message: 'Waste details saved. Now upload photos for verification.' });
-      setStep(2); // Move to Verify step
+      setStep(2);
     } catch (e) {
       console.error('❌ Failed to create listing:', e);
       addToast({ type: 'error', title: 'Failed to Save', message: e.message || 'Could not save your listing. Please try again.' });
@@ -388,34 +388,32 @@ export default function WasteListing({ onNavigate }) {
     await analyse(files, declaredCategory, declaredSubcategory);
   }
 
-  // After CV verification, move to pricing step
+  // After CV verification, save results and move to pricing
   async function handleContinueToPricing() {
     if (!createdListing || !visionResult) return;
-    
-    // Update listing with vision results
+    setLoading(true); // ✅ show spinner while uploading
     try {
       await listingsService.update(createdListing.id, {
-        vision_confidence: visionResult.confidence,
-        vision_quality: visionResult.qualityScore,
+        vision_confidence:  visionResult.confidence,
+        vision_quality:     visionResult.qualityScore,
         vision_consistency: visionResult.consistencyScore,
-        vision_verdict: visionResult.verdict,
-        vision_notes: visionResult.notes,
+        vision_verdict:     visionResult.verdict,
+        vision_notes:       visionResult.notes,
       });
-      
-      // Upload images to storage
       if (files.length > 0) {
         await listingsService.uploadImages(createdListing.id, files);
       }
-      
       addToast({ type: 'success', title: 'Verification Complete', message: 'Your waste has been verified. Now set your price.' });
-      setStep(3); // Move to Price step
+      setStep(3);
     } catch (e) {
       console.error('Failed to save verification results:', e);
       addToast({ type: 'error', title: 'Verification Error', message: 'Please try again.' });
+    } finally {
+      setLoading(false); // ✅ always reset spinner
     }
   }
 
-  // ── Step 3: Accept price (AI pricing now uses vision results if available) ──
+  // ── Step 3: Accept price ──────────────────────────────────────────────
 
   async function handleAcceptPrice() {
     if (!createdListing) {
@@ -431,23 +429,25 @@ export default function WasteListing({ onNavigate }) {
     setLoading(true);
     try {
       const pricePayload = {
-        price_per_kg: finalPricePerKg,
-        final_price: finalPriceTotal,
-        base_price: aiPricing?.baseRate || finalPricePerKg,
+        price_per_kg:       finalPricePerKg,
+        final_price:        finalPriceTotal,
+        base_price:         aiPricing?.baseRate || finalPricePerKg,
         quality_adjustment: aiPricing?.adjustments?.quality || 0,
-        volume_adjustment: aiPricing?.adjustments?.volume || 0,
+        volume_adjustment:  aiPricing?.adjustments?.volume || 0,
       };
       console.log('💰 Accepting price:', pricePayload);
       const updatedListing = await listingsService.acceptPrice(createdListing.id, pricePayload);
       console.log('✅ Price accepted:', updatedListing);
       setCreatedListing(updatedListing);
-      
-      // Auto-approve if verified, otherwise submit for review
+
+      // Auto-approve if CV verified, otherwise goes to manual review
       if (visionResult?.verdict === 'verified') {
         await listingsService.autoApprove(createdListing.id, visionResult);
+        addToast({ type: 'success', title: 'Listing Live!', message: `Your ${wasteType} listing is now active on the marketplace.` });
+      } else {
+        addToast({ type: 'info', title: 'Listing Submitted', message: 'Your listing is pending administrator review.' });
       }
-      
-      addToast({ type: 'success', title: 'Listing Live!', message: `Your ${wasteType} listing is now active on the marketplace.` });
+
       setStep(4);
     } catch (e) {
       console.error('❌ Failed to accept price:', e);
@@ -471,43 +471,28 @@ export default function WasteListing({ onNavigate }) {
 
   const formatKES = (amount) => `KES ${Math.round(amount).toLocaleString()}`;
 
-  // ── AI Pricing Effect (now uses vision results for better accuracy) ────────
+  // ── AI Pricing Effect ─────────────────────────────────────────────────
+  // Only runs on step 3 (after CV verification is complete)
 
   useEffect(() => {
     const fetchAiPrice = async () => {
       if (!wasteType || !qty || quantityNum <= 0) return;
-      if (!visionResult && step === 3) return; // Don't fetch price until after verification
-      
+      if (step !== 3) return; // only fetch price on the pricing step
+
       setPricingLoading(true);
       try {
-        // Use vision quality scores to adjust price if available
-        const qualityMultiplier = visionResult?.qualityScore 
-          ? (visionResult.qualityScore / 100) 
-          : 1.0;
-          // eslint-disable-next-line
-        const consistencyMultiplier = visionResult?.consistencyScore 
-          ? (visionResult.consistencyScore / 100) 
-          : 1.0;
-        
-        const result = await getPrice({ 
-          wasteType, 
-          subtype, 
-          quantity: quantityNum, 
-          condition, 
-          county, 
+        const result = await getPrice({
+          wasteType,
+          subtype,
+          quantity: quantityNum,
+          condition,
+          county,
           collectionPoint,
-          // Pass vision results for better pricing
-          visionQuality: visionResult?.qualityScore,
-          visionConsistency: visionResult?.consistencyScore,
         });
-        
-        // Apply vision-based adjustments if needed
-        if (qualityMultiplier !== 1.0) {
-          result.perKgRange.recommended = result.perKgRange.recommended * qualityMultiplier;
-        }
-        
+
         setAiPricing(result);
-        const recommended = result.perKgRange?.recommended || result.priceRange?.recommended;
+        // ✅ use priceRange.recommended — this is what pricingService returns
+        const recommended = result.priceRange?.recommended;
         if (priceSource === 'ai' && !selectedPricePerKg) setSelectedPricePerKg(recommended);
       } catch (err) {
         console.error('AI pricing failed:', err);
@@ -519,7 +504,7 @@ export default function WasteListing({ onNavigate }) {
     const t = setTimeout(fetchAiPrice, 500);
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wasteType, subtype, qty, condition, county, collectionPoint, visionResult, step]);
+  }, [wasteType, subtype, qty, condition, county, collectionPoint, step]);
 
   // ── File handling ─────────────────────────────────────────────────────
 
@@ -540,13 +525,12 @@ export default function WasteListing({ onNavigate }) {
     setPreviews(prev => prev.filter((_, idx) => idx !== i));
   }
 
-  // ── Render: Step 1 — Details (unchanged, same as before) ──────────────────
+  // ── Render: Step 1 — Details ──────────────────────────────────────────
 
   const renderDetailsStep = () => (
     <div className="card">
       <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16 }}>Step 1 — Waste Details</div>
 
-      {/* Waste Type */}
       <div className="form-group">
         <label className="form-label">Waste Type *</label>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 8 }}>
@@ -613,7 +597,7 @@ export default function WasteListing({ onNavigate }) {
         </div>
       </div>
 
-      {/* Location with Geoapify autocomplete */}
+      {/* Location */}
       <div className="form-group">
         <label className="form-label">Pickup Location *</label>
         <button
@@ -721,6 +705,7 @@ export default function WasteListing({ onNavigate }) {
         </div>
       </div>
 
+      {/* ✅ Notes restored — state was declared but textarea was missing */}
       <div className="form-group">
         <label className="form-label">Notes (optional)</label>
         <textarea className="form-input" rows={3} value={notes}
@@ -734,13 +719,13 @@ export default function WasteListing({ onNavigate }) {
     </div>
   );
 
-  // ── Render: Step 2 — CV Photo Verification (before pricing) ────────────────
+  // ── Render: Step 2 — CV Photo Verification ────────────────────────────
 
   const renderVerifyStep = () => {
     const verdictConfig = {
-      verified:       { color: '#2A6A2A', bg: '#E8F5E9', label: 'Verified ✓', canSubmit: true },
-      low_confidence: { color: '#7A5A00', bg: '#FFF8E1', label: 'Low Confidence — More images needed', canSubmit: false },
-      rejected:       { color: '#8A2020', bg: '#FFEBEE', label: 'Manual Review Required', canSubmit: false },
+      verified:       { color: '#2A6A2A', bg: '#E8F5E9', label: 'Verified ✓' },
+      low_confidence: { color: '#7A5A00', bg: '#FFF8E1', label: 'Low Confidence — More images needed' },
+      rejected:       { color: '#8A2020', bg: '#FFEBEE', label: 'Manual Review Required' },
     };
     const vc = visionResult ? verdictConfig[visionResult.verdict] : null;
 
@@ -752,7 +737,6 @@ export default function WasteListing({ onNavigate }) {
           This ensures accurate price recommendations.
         </div>
 
-        {/* Photo tips */}
         {!visionResult && (
           <div style={{ background: '#f0f5ec', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: 12, color: '#555' }}>
             📸 <strong>Photo tips for best verification results:</strong>
@@ -765,7 +749,6 @@ export default function WasteListing({ onNavigate }) {
           </div>
         )}
 
-        {/* Upload zone */}
         {!visionResult && (
           <>
             <div
@@ -814,7 +797,6 @@ export default function WasteListing({ onNavigate }) {
           </>
         )}
 
-        {/* CV loading */}
         {visionLoading && (
           <div style={{ textAlign: 'center', padding: '32px 0' }}>
             <div className="loading-spinner" style={{ margin: '0 auto 12px', width: 32, height: 32 }} />
@@ -825,7 +807,6 @@ export default function WasteListing({ onNavigate }) {
           </div>
         )}
 
-        {/* CV error */}
         {visionError && !visionLoading && (
           <div style={{ background: '#FFEBEE', borderRadius: 8, padding: 14, marginBottom: 14, fontSize: 13, color: '#8A2020' }}>
             ⚠️ Verification failed: {visionError}
@@ -837,7 +818,6 @@ export default function WasteListing({ onNavigate }) {
           </div>
         )}
 
-        {/* CV result */}
         {visionResult && !visionLoading && (
           <div style={{ marginBottom: 16 }}>
             <div style={{
@@ -857,8 +837,8 @@ export default function WasteListing({ onNavigate }) {
 
             {[
               { label: 'Detection Confidence', value: visionResult.confidence },
-              { label: 'Quality Score', value: visionResult.qualityScore },
-              { label: 'Batch Consistency', value: visionResult.consistencyScore },
+              { label: 'Quality Score',         value: visionResult.qualityScore },
+              { label: 'Batch Consistency',     value: visionResult.consistencyScore },
             ].map(({ label, value }) => (
               <div key={label} style={{ marginBottom: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
@@ -895,7 +875,6 @@ export default function WasteListing({ onNavigate }) {
           </div>
         )}
 
-        {/* Action buttons */}
         <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
           <Button variant="secondary" onClick={() => setStep(1)}>← Back to Details</Button>
 
@@ -909,8 +888,9 @@ export default function WasteListing({ onNavigate }) {
             </Button>
           )}
 
+          {/* ✅ loading prop added so button shows spinner during upload */}
           {visionResult && !visionLoading && (
-            <Button variant="primary" onClick={handleContinueToPricing}>
+            <Button variant="primary" loading={loading} onClick={handleContinueToPricing}>
               Continue to Pricing →
             </Button>
           )}
@@ -919,7 +899,7 @@ export default function WasteListing({ onNavigate }) {
     );
   };
 
-  // ── Render: Step 3 — Pricing (after verification) ──────────────────────────
+  // ── Render: Step 3 — Pricing ──────────────────────────────────────────
 
   const renderPricingStep = () => (
     <div className="card">
@@ -932,12 +912,14 @@ export default function WasteListing({ onNavigate }) {
         )}
       </div>
 
-      {/* Show verification summary if available */}
       {visionResult && (
         <div style={{ background: '#f0f5ec', borderRadius: 8, padding: '8px 12px', marginBottom: 16, fontSize: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <Icons.CheckCircle />
-            <span>AI Verification Score: <strong>{visionResult.confidence}%</strong> — {visionResult.verdict === 'verified' ? 'Verified ✓' : 'Manual review pending'}</span>
+            <span>
+              AI Verification Score: <strong>{visionResult.confidence}%</strong>
+              {' — '}{visionResult.verdict === 'verified' ? 'Verified ✓' : 'Manual review pending'}
+            </span>
           </div>
         </div>
       )}
@@ -949,7 +931,7 @@ export default function WasteListing({ onNavigate }) {
               <span style={{
                 padding: '4px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
                 background: aiPricing.marketInfo.tier === 'formal' ? '#E8F5E9' : aiPricing.marketInfo.tier === 'semi_formal' ? '#FFF8E1' : '#FFF3E0',
-                color: aiPricing.marketInfo.tier === 'formal' ? '#2A6A2A' : aiPricing.marketInfo.tier === 'semi_formal' ? '#7A5A00' : '#8A4000',
+                color:      aiPricing.marketInfo.tier === 'formal' ? '#2A6A2A' : aiPricing.marketInfo.tier === 'semi_formal' ? '#7A5A00' : '#8A4000',
               }}>
                 {aiPricing.marketInfo.tier?.replace('_', ' ')} tier
               </span>
@@ -967,12 +949,13 @@ export default function WasteListing({ onNavigate }) {
               <Icons.Sparkles />AI Market Recommendation
             </div>
             <div style={{ fontSize: 14, color: '#444', marginBottom: 4 }}>Rate per kilogram</div>
+            {/* ✅ uses priceRange.recommended only — perKgRange removed */}
             <div style={{ fontSize: 32, fontWeight: 700, color: '#2A6A2A' }}>
-              {formatKES(aiPricing.perKgRange?.recommended || aiPricing.priceRange?.recommended)}/kg
+              {formatKES(aiPricing.priceRange?.recommended)}/kg
             </div>
             {quantityNum > 1 && (
               <div style={{ fontSize: 13, color: '#444', marginTop: 8 }}>
-                Total for {quantityNum} kg: <strong>{formatKES((aiPricing.perKgRange?.recommended || aiPricing.priceRange?.recommended) * quantityNum)}</strong>
+                Total for {quantityNum} kg: <strong>{formatKES(aiPricing.priceRange?.recommended * quantityNum)}</strong>
               </div>
             )}
             {aiPricing.priceRange && (
@@ -991,8 +974,8 @@ export default function WasteListing({ onNavigate }) {
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, cursor: 'pointer' }}>
               <input type="radio" checked={priceSource === 'ai'}
-                onChange={() => { setPriceSource('ai'); setSelectedPricePerKg(aiPricing.perKgRange?.recommended || aiPricing.priceRange?.recommended); }} />
-              <span>Use AI recommended price <strong>{formatKES(aiPricing.perKgRange?.recommended || aiPricing.priceRange?.recommended)}/kg</strong></span>
+                onChange={() => { setPriceSource('ai'); setSelectedPricePerKg(aiPricing.priceRange?.recommended); }} />
+              <span>Use AI recommended price <strong>{formatKES(aiPricing.priceRange?.recommended)}/kg</strong></span>
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
               <input type="radio" checked={priceSource === 'manual'}
@@ -1006,7 +989,7 @@ export default function WasteListing({ onNavigate }) {
               <label className="form-label">Your Price (KES per kg)</label>
               <input className="form-input" type="number" min="0" step="0.5" value={manualPricePerKg}
                 onChange={e => { const v = parseFloat(e.target.value); setManualPricePerKg(e.target.value); setSelectedPricePerKg(isNaN(v) ? null : v); }}
-                placeholder={`e.g., ${Math.round((aiPricing.perKgRange?.recommended || 13) * 0.9)}`}
+                placeholder={`e.g., ${Math.round((aiPricing.priceRange?.recommended || 13) * 0.9)}`}
               />
             </div>
           )}
@@ -1052,7 +1035,7 @@ export default function WasteListing({ onNavigate }) {
     </div>
   );
 
-  // ── Render: Step 4 — Done (same as before) ─────────────────────────────────
+  // ── Render: Step 4 — Done ─────────────────────────────────────────────
 
   const renderDoneStep = () => {
     const wasAutoApproved = visionResult?.verdict === 'verified';
@@ -1088,8 +1071,8 @@ export default function WasteListing({ onNavigate }) {
             <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 8 }}>CV Verification Summary</div>
             {[
               { label: 'Detection Confidence', value: visionResult.confidence },
-              { label: 'Quality Score', value: visionResult.qualityScore },
-              { label: 'Batch Consistency', value: visionResult.consistencyScore },
+              { label: 'Quality Score',         value: visionResult.qualityScore },
+              { label: 'Batch Consistency',     value: visionResult.consistencyScore },
             ].map(({ label, value }) => (
               <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
                 <span style={{ color: '#666' }}>{label}</span>
