@@ -49,4 +49,26 @@ export const listingsService = {
     console.log('💰 Accepting price via API client:', payload);
     return api.post(`/listings/${id}/accept-price`, payload);
   },
+
+  autoApprove(id, visionData) {
+  return api.post(`/listings/${id}/approve`, {
+    vision_confidence:  visionData.confidence,
+    vision_quality:     visionData.qualityScore,
+    vision_consistency: visionData.consistencyScore,
+    vision_verdict:     visionData.verdict,
+    vision_notes:       visionData.notes,
+  });
+},
+
+requestMoreImages(id, visionData) {
+  return api.post(`/listings/${id}/request-more`, {
+    vision_confidence:  visionData.confidence,
+    vision_quality:     visionData.qualityScore,
+    vision_consistency: visionData.consistencyScore,
+    vision_verdict:     visionData.verdict,
+    vision_notes:       visionData.notes,
+  });
+},
+
+
 };
