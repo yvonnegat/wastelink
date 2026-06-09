@@ -1,14 +1,17 @@
-import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { WASTE_TYPES } from '../../data/mockData';
 import { Button, StepIndicator, Alert } from '../common';
 import Icon from '../common/Icon';
 import { listingsService } from '../../services/ListingService';
+import { useVision } from '../../hooks/useVision';
 import { getPrice } from '../../services/pricingService';
 import {
   Recycle, Newspaper, Cog, Wine, Sprout, MonitorSmartphone, Scissors, Disc3
 } from 'lucide-react';
 
-const STEPS = ['Details', 'Price', 'Upload', 'Done'];
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const STEPS = ['Details', 'Price', 'Verify', 'Done'];
 
 const CONDITIONS = [
   { label: 'Clean / Sorted', value: 'clean' },
@@ -25,7 +28,7 @@ const COLLECTION_POINTS = [
 
 const COUNTIES = [
   'Nairobi', 'Mombasa', 'Kisumu', 'Kiambu', 'Nakuru', 'Eldoret',
-  'Machakos', 'Kajiado', 'Tharaka Nithi', 'Meru', 'Nyeri', 'Kirinyaga'
+  'Machakos', 'Kajiado', 'Tharaka Nithi', 'Meru', 'Nyeri', 'Kirinyaga',
 ];
 
 const SUBTYPE_MAP = {
@@ -38,6 +41,19 @@ const SUBTYPE_MAP = {
   'Phones': 'phones', 'Computers': 'computers', 'Batteries': 'batteries', 'Cables': 'cables',
 };
 
+const WASTE_TILE_CONFIG = {
+  Plastic:   { LucideIcon: Recycle,          color: '#0ea5e9', bg: '#f0f9ff', border: '#bae6fd', selectedBg: '#e0f2fe', selectedBorder: '#0ea5e9' },
+  Paper:     { LucideIcon: Newspaper,         color: '#f59e0b', bg: '#fffbeb', border: '#fde68a', selectedBg: '#fef3c7', selectedBorder: '#f59e0b' },
+  Metal:     { LucideIcon: Cog,               color: '#6b7280', bg: '#f9fafb', border: '#d1d5db', selectedBg: '#f3f4f6', selectedBorder: '#6b7280' },
+  Glass:     { LucideIcon: Wine,              color: '#14b8a6', bg: '#f0fdfa', border: '#99f6e4', selectedBg: '#ccfbf1', selectedBorder: '#14b8a6' },
+  Organic:   { LucideIcon: Sprout,            color: '#22c55e', bg: '#f0fdf4', border: '#bbf7d0', selectedBg: '#dcfce7', selectedBorder: '#22c55e' },
+  'E-Waste': { LucideIcon: MonitorSmartphone, color: '#8b5cf6', bg: '#faf5ff', border: '#ddd6fe', selectedBg: '#ede9fe', selectedBorder: '#8b5cf6' },
+  Textile:   { LucideIcon: Scissors,          color: '#ec4899', bg: '#fdf2f8', border: '#fbcfe8', selectedBg: '#fce7f3', selectedBorder: '#ec4899' },
+  Rubber:    { LucideIcon: Disc3,             color: '#374151', bg: '#f9fafb', border: '#e5e7eb', selectedBg: '#f3f4f6', selectedBorder: '#374151' },
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function buildWasteTypeArray(wasteTypesData) {
   if (Array.isArray(wasteTypesData)) return wasteTypesData;
   if (typeof wasteTypesData === 'object' && wasteTypesData !== null) {
@@ -49,7 +65,8 @@ function buildWasteTypeArray(wasteTypesData) {
   return [];
 }
 
-// ─── SVG Icon Components ───────────────────────────────────────────────────────
+// ─── SVG Icon Components ──────────────────────────────────────────────────────
+
 const SvgIcon = ({ d, size = 20, color = 'currentColor', strokeWidth = 1.75, viewBox = '0 0 24 24', style = {} }) => (
   <svg
     width={size} height={size} viewBox={viewBox} fill="none"
@@ -61,39 +78,26 @@ const SvgIcon = ({ d, size = 20, color = 'currentColor', strokeWidth = 1.75, vie
 );
 
 const Icons = {
-  // UI icons only — waste type icons use Lucide (imported above)
-  MapPin:     () => <SvgIcon size={16} d={["M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z","M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0-6 0"]} />,
-  Crosshair:  () => <SvgIcon size={16} d={["M12 2v4","M12 18v4","M2 12h4","M18 12h4","M12 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0-6 0"]} />,
-  ChevronRight: () => <SvgIcon size={16} d="M9 18l6-6-6-6" />,
-  ChevronLeft:  () => <SvgIcon size={16} d="M15 18l-6-6 6-6" />,
-  CheckCircle:  () => <SvgIcon size={20} d={["M22 11.08V12a10 10 0 1 1-5.93-9.14","M22 4L12 14.01l-3-3"]} color="#22a855" />,
-  XCircle:      () => <SvgIcon size={20} d={["M22 12A10 10 0 1 1 2 12a10 10 0 0 1 20 0","M15 9l-6 6","M9 9l6 6"]} color="#e05050" />,
-  AlertTriangle: () => <SvgIcon size={20} d={["M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z","M12 9v4","M12 17h.01"]} color="#f59e0b" />,
-  Info:         () => <SvgIcon size={20} d={["M12 22A10 10 0 1 0 12 2a10 10 0 0 0 0 20z","M12 16v-4","M12 8h.01"]} color="#3b82f6" />,
+  MapPin:       () => <SvgIcon size={16} d={["M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z", "M12 10m-3 0a3 3 0 1 0 6 0a3 3 0 1 0-6 0"]} />,
+  Crosshair:    () => <SvgIcon size={16} d={["M12 2v4", "M12 18v4", "M2 12h4", "M18 12h4", "M12 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0-6 0"]} />,
+  CheckCircle:  () => <SvgIcon size={20} d={["M22 11.08V12a10 10 0 1 1-5.93-9.14", "M22 4L12 14.01l-3-3"]} color="#22a855" />,
+  XCircle:      () => <SvgIcon size={20} d={["M22 12A10 10 0 1 1 2 12a10 10 0 0 1 20 0", "M15 9l-6 6", "M9 9l6 6"]} color="#e05050" />,
+  AlertTriangle:() => <SvgIcon size={20} d={["M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z", "M12 9v4", "M12 17h.01"]} color="#f59e0b" />,
+  Info:         () => <SvgIcon size={20} d={["M12 22A10 10 0 1 0 12 2a10 10 0 0 0 0 20z", "M12 16v-4", "M12 8h.01"]} color="#3b82f6" />,
   X:            () => <SvgIcon size={14} d="M18 6L6 18M6 6l12 12" strokeWidth={2.5} />,
-  Camera:       () => <SvgIcon size={28} d={["M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z","M12 17A4 4 0 1 0 12 9a4 4 0 0 0 0 8z"]} color="#2A6A2A" />,
-  Building2:    () => <SvgIcon size={18} d={["M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18z","M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2","M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2","M10 6h4","M10 10h4","M10 14h4","M10 18h4"]} />,
-  Factory:      () => <SvgIcon size={18} d={["M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v16z","M17 18h1","M12 18h1","M7 18h1"]} />,
-  Home:         () => <SvgIcon size={18} d={["M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z","M9 22V12h6v10"]} />,
+  Camera:       () => <SvgIcon size={28} d={["M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z", "M12 17A4 4 0 1 0 12 9a4 4 0 0 0 0 8z"]} color="#2A6A2A" />,
+  Building2:    () => <SvgIcon size={18} d={["M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18z", "M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2", "M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2", "M10 6h4", "M10 10h4", "M10 14h4", "M10 18h4"]} />,
+  Factory:      () => <SvgIcon size={18} d={["M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v16z", "M17 18h1", "M12 18h1", "M7 18h1"]} />,
+  Home:         () => <SvgIcon size={18} d={["M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z", "M9 22V12h6v10"]} />,
   TrendingUp:   () => <SvgIcon size={16} d="M23 6l-9.5 9.5-5-5L1 18" />,
   Loader:       () => <SvgIcon size={16} d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />,
-  Sparkles:     () => <SvgIcon size={14} d={["M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z","M5 17l.75 2.25L8 20l-2.25.75L5 23l-.75-2.25L2 20l2.25-.75L5 17z"]} />,
+  Sparkles:     () => <SvgIcon size={14} d={["M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z", "M5 17l.75 2.25L8 20l-2.25.75L5 23l-.75-2.25L2 20l2.25-.75L5 17z"]} />,
 };
 
 const CollectionIcons = { commercial: Icons.Building2, industrial: Icons.Factory, household: Icons.Home };
 
-const WASTE_TILE_CONFIG = {
-  Plastic:   { LucideIcon: Recycle,           color: '#0ea5e9', bg: '#f0f9ff', border: '#bae6fd', selectedBg: '#e0f2fe', selectedBorder: '#0ea5e9' },
-  Paper:     { LucideIcon: Newspaper,          color: '#f59e0b', bg: '#fffbeb', border: '#fde68a', selectedBg: '#fef3c7', selectedBorder: '#f59e0b' },
-  Metal:     { LucideIcon: Cog,                color: '#6b7280', bg: '#f9fafb', border: '#d1d5db', selectedBg: '#f3f4f6', selectedBorder: '#6b7280' },
-  Glass:     { LucideIcon: Wine,               color: '#14b8a6', bg: '#f0fdfa', border: '#99f6e4', selectedBg: '#ccfbf1', selectedBorder: '#14b8a6' },
-  Organic:   { LucideIcon: Sprout,             color: '#22c55e', bg: '#f0fdf4', border: '#bbf7d0', selectedBg: '#dcfce7', selectedBorder: '#22c55e' },
-  'E-Waste': { LucideIcon: MonitorSmartphone,  color: '#8b5cf6', bg: '#faf5ff', border: '#ddd6fe', selectedBg: '#ede9fe', selectedBorder: '#8b5cf6' },
-  Textile:   { LucideIcon: Scissors,           color: '#ec4899', bg: '#fdf2f8', border: '#fbcfe8', selectedBg: '#fce7f3', selectedBorder: '#ec4899' },
-  Rubber:    { LucideIcon: Disc3,              color: '#374151', bg: '#f9fafb', border: '#e5e7eb', selectedBg: '#f3f4f6', selectedBorder: '#374151' },
-};
+// ─── Toast System ─────────────────────────────────────────────────────────────
 
-// ─── Toast Notification System ────────────────────────────────────────────────
 let toastId = 0;
 const toastListeners = [];
 const addToast = (toast) => { toastListeners.forEach(fn => fn({ id: ++toastId, ...toast })); };
@@ -104,9 +108,7 @@ function ToastContainer() {
   useEffect(() => {
     const handler = (toast) => {
       setToasts(prev => [...prev, toast]);
-      setTimeout(() => {
-        setToasts(prev => prev.filter(t => t.id !== toast.id));
-      }, toast.duration || 4000);
+      setTimeout(() => setToasts(prev => prev.filter(t => t.id !== toast.id)), toast.duration || 4000);
     };
     toastListeners.push(handler);
     return () => { const i = toastListeners.indexOf(handler); if (i > -1) toastListeners.splice(i, 1); };
@@ -115,28 +117,24 @@ function ToastContainer() {
   const dismiss = (id) => setToasts(prev => prev.filter(t => t.id !== id));
 
   const typeStyles = {
-    success: { bg: '#f0fdf4', border: '#86efac', icon: <Icons.CheckCircle />, titleColor: '#15803d' },
-    error:   { bg: '#fef2f2', border: '#fca5a5', icon: <Icons.XCircle />,     titleColor: '#b91c1c' },
-    warning: { bg: '#fffbeb', border: '#fcd34d', icon: <Icons.AlertTriangle />, titleColor: '#92400e' },
-    info:    { bg: '#eff6ff', border: '#93c5fd', icon: <Icons.Info />,         titleColor: '#1e40af' },
+    success: { bg: '#f0fdf4', border: '#86efac', icon: <Icons.CheckCircle />,   titleColor: '#15803d' },
+    error:   { bg: '#fef2f2', border: '#fca5a5', icon: <Icons.XCircle />,        titleColor: '#b91c1c' },
+    warning: { bg: '#fffbeb', border: '#fcd34d', icon: <Icons.AlertTriangle />,  titleColor: '#92400e' },
+    info:    { bg: '#eff6ff', border: '#93c5fd', icon: <Icons.Info />,            titleColor: '#1e40af' },
   };
 
   return (
     <div style={{
       position: 'fixed', bottom: 24, right: 24, zIndex: 10000,
       display: 'flex', flexDirection: 'column', gap: 10,
-      maxWidth: 360, width: 'calc(100vw - 48px)',
-      pointerEvents: 'none',
+      maxWidth: 360, width: 'calc(100vw - 48px)', pointerEvents: 'none',
     }}>
       {toasts.map((toast) => {
         const s = typeStyles[toast.type] || typeStyles.info;
         return (
           <div key={toast.id} style={{
-            background: s.bg,
-            border: `1px solid ${s.border}`,
-            borderRadius: 12,
-            padding: '14px 16px',
-            display: 'flex', alignItems: 'flex-start', gap: 12,
+            background: s.bg, border: `1px solid ${s.border}`, borderRadius: 12,
+            padding: '14px 16px', display: 'flex', alignItems: 'flex-start', gap: 12,
             boxShadow: '0 8px 24px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08)',
             pointerEvents: 'all',
             animation: 'toastIn 0.28s cubic-bezier(0.34, 1.56, 0.64, 1)',
@@ -148,14 +146,9 @@ function ToastContainer() {
                   {toast.title}
                 </div>
               )}
-              {toast.message && (
-                <div style={{ fontSize: 13, color: '#444', lineHeight: 1.4 }}>{toast.message}</div>
-              )}
+              {toast.message && <div style={{ fontSize: 13, color: '#444', lineHeight: 1.4 }}>{toast.message}</div>}
             </div>
-            <button
-              onClick={() => dismiss(toast.id)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#888', flexShrink: 0, marginTop: 1 }}
-            >
+            <button onClick={() => dismiss(toast.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: '#888', flexShrink: 0, marginTop: 1 }}>
               <Icons.X />
             </button>
           </div>
@@ -172,6 +165,7 @@ function ToastContainer() {
 }
 
 // ─── Inline Field Error ───────────────────────────────────────────────────────
+
 function FieldError({ message }) {
   if (!message) return null;
   return (
@@ -188,9 +182,11 @@ function FieldError({ message }) {
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
+
 export default function WasteListing({ onNavigate }) {
   const wasteTypeArray = useMemo(() => buildWasteTypeArray(WASTE_TYPES), []);
 
+  // Step state
   const [step, setStep] = useState(1);
   const [wasteType, setWasteType] = useState('');
   const [subtype, setSubtype] = useState('');
@@ -198,28 +194,40 @@ export default function WasteListing({ onNavigate }) {
   const [condition, setCondition] = useState('clean');
   const [collectionPoint, setCollectionPoint] = useState('commercial');
   const [county, setCounty] = useState('Nairobi');
-  const [distanceKm, setDistanceKm] = useState(5);
   const [notes, setNotes] = useState('');
 
+  // Location state
   const [location, setLocation] = useState('');
   const [lat, setLat] = useState(null);
   const [lng, setLng] = useState(null);
   const [isLocating, setIsLocating] = useState(false);
+  // Geoapify autocomplete
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
+  // AI Pricing state
   const [aiPricing, setAiPricing] = useState(null);
   const [pricingLoading, setPricingLoading] = useState(false);
   const [selectedPricePerKg, setSelectedPricePerKg] = useState(null);
   const [priceSource, setPriceSource] = useState('ai');
   const [manualPricePerKg, setManualPricePerKg] = useState('');
 
+  // Listing & file state
   const [createdListing, setCreatedListing] = useState(null);
   const [files, setFiles] = useState([]);
   const [previews, setPreviews] = useState([]);
   const [drag, setDrag] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Vision (team's CV verification)
+  const {
+    result: visionResult,
+    loading: visionLoading,
+    error: visionError,
+    analyse,
+    clear: clearVision,
+  } = useVision();
 
   // Inline field errors
   const [fieldErrors, setFieldErrors] = useState({});
@@ -231,12 +239,13 @@ export default function WasteListing({ onNavigate }) {
   const fileRef = useRef();
 
   // ── Validation helpers ────────────────────────────────────────────────
+
+  const clearFieldError = (field) =>
+    setFieldErrors(prev => { const e = { ...prev }; delete e[field]; return e; });
+
   const setFieldError = (field, msg) =>
     setFieldErrors(prev => msg ? { ...prev, [field]: msg } : (() => { const e = { ...prev }; delete e[field]; return e; })());
 
-  const clearFieldError = (field) => setFieldErrors(prev => { const e = { ...prev }; delete e[field]; return e; });
-
-  // Live validation on blur / change
   const validateQty = (val) => {
     const n = parseFloat(val);
     if (!val) return 'Quantity is required';
@@ -244,12 +253,14 @@ export default function WasteListing({ onNavigate }) {
     return null;
   };
 
-  const validateLocation = (loc) => {
-    if (!loc && !lat) return 'Pickup location is required';
-    return null;
-  };
+  const validateLocation = (loc) => (!loc && !lat ? 'Pickup location is required' : null);
 
-  // ── Suggestions ───────────────────────────────────────────────────────
+  const inputStyle = (fieldName) => fieldErrors[fieldName] ? {
+    borderColor: '#fca5a5', background: '#fff8f8', boxShadow: '0 0 0 3px rgba(239,68,68,0.08)',
+  } : {};
+
+  // ── Geoapify autocomplete ─────────────────────────────────────────────
+
   const fetchSuggestions = async (text) => {
     if (!text || text.length < 3) { setSuggestions([]); return; }
     setLoadingSuggestions(true);
@@ -269,7 +280,10 @@ export default function WasteListing({ onNavigate }) {
   useEffect(() => {
     const timer = setTimeout(() => fetchSuggestions(location), 400);
     return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location]);
+
+  // ── Current location (reverse-geocode via Nominatim) ─────────────────
 
   const getCurrentLocation = () => {
     setIsLocating(true);
@@ -283,7 +297,9 @@ export default function WasteListing({ onNavigate }) {
         const { latitude, longitude } = position.coords;
         setLat(latitude); setLng(longitude);
         try {
-          const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+          );
           const data = await response.json();
           const addr = data?.display_name || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
           setLocation(addr);
@@ -304,7 +320,8 @@ export default function WasteListing({ onNavigate }) {
     );
   };
 
-  // ── AI Pricing ───────────────────────────────────────────────────────
+  // ── AI Pricing ────────────────────────────────────────────────────────
+
   useEffect(() => {
     const fetchAiPrice = async () => {
       if (!wasteType || !qty || quantityNum <= 0) return;
@@ -323,9 +340,11 @@ export default function WasteListing({ onNavigate }) {
     };
     const t = setTimeout(fetchAiPrice, 500);
     return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wasteType, subtype, qty, condition, county, collectionPoint]);
 
   // ── File handling ─────────────────────────────────────────────────────
+
   function handleFile(newFiles) {
     const valid = Array.from(newFiles).filter(f => f.type.startsWith('image/'));
     setFiles(prev => [...prev, ...valid].slice(0, 5));
@@ -337,12 +356,14 @@ export default function WasteListing({ onNavigate }) {
   }
 
   function handleDrop(e) { e.preventDefault(); setDrag(false); handleFile(e.dataTransfer.files); }
+
   function removeFile(i) {
     setFiles(prev => prev.filter((_, idx) => idx !== i));
     setPreviews(prev => prev.filter((_, idx) => idx !== i));
   }
 
-  // ── Step handlers ─────────────────────────────────────────────────────
+  // ── Step 1: Create listing ────────────────────────────────────────────
+
   async function handleCreateListing() {
     const errors = {};
     if (!wasteType) errors.wasteType = 'Please select a waste type';
@@ -356,7 +377,7 @@ export default function WasteListing({ onNavigate }) {
       addToast({
         type: 'warning',
         title: 'Missing Information',
-        message: `Please fill in the required fields: ${Object.values(errors).join(', ')}`,
+        message: `Please fill in: ${Object.values(errors).join(', ')}`,
         duration: 5000,
       });
       return;
@@ -376,17 +397,21 @@ export default function WasteListing({ onNavigate }) {
         ...(lat && { lat }),
         ...(lng && { lng }),
       };
+      console.log('📦 Creating listing with payload:', listingPayload);
       const listing = await listingsService.create(listingPayload);
+      console.log('✅ Listing created:', listing);
       setCreatedListing(listing);
       addToast({ type: 'success', title: 'Details Saved', message: 'Waste details saved. Now set your price.' });
       setStep(2);
     } catch (e) {
-      console.error('Failed to create listing:', e);
+      console.error('❌ Failed to create listing:', e);
       addToast({ type: 'error', title: 'Failed to Save', message: e.message || 'Could not save your listing. Please try again.' });
     } finally {
       setLoading(false);
     }
   }
+
+  // ── Step 2: Accept price ──────────────────────────────────────────────
 
   async function handleAcceptPrice() {
     if (!createdListing) {
@@ -398,64 +423,105 @@ export default function WasteListing({ onNavigate }) {
       addToast({ type: 'warning', title: 'Price Required', message: 'Please select or enter a valid price per kg.' });
       return;
     }
+    const finalPriceTotal = finalPricePerKg * quantityNum;
     setLoading(true);
     try {
-      const updatedListing = await listingsService.acceptPrice(createdListing.id, {
+      const pricePayload = {
         price_per_kg: finalPricePerKg,
-        final_price: finalPricePerKg * quantityNum,
+        final_price: finalPriceTotal,
         base_price: aiPricing?.baseRate || finalPricePerKg,
         quality_adjustment: aiPricing?.adjustments?.quality || 0,
         volume_adjustment: aiPricing?.adjustments?.volume || 0,
-      });
+      };
+      console.log('💰 Accepting price:', pricePayload);
+      const updatedListing = await listingsService.acceptPrice(createdListing.id, pricePayload);
+      console.log('✅ Price accepted:', updatedListing);
       setCreatedListing(updatedListing);
       addToast({ type: 'success', title: 'Price Confirmed', message: `${formatKES(finalPricePerKg)}/kg locked in. Add photos next.` });
       setStep(3);
     } catch (e) {
+      console.error('❌ Failed to accept price:', e);
       addToast({ type: 'error', title: 'Failed to Save Price', message: e.message || 'Please try again.' });
     } finally {
       setLoading(false);
     }
   }
 
+  // ── Step 3: Run CV verification ───────────────────────────────────────
+
   async function handleUploadImages() {
     if (!createdListing) {
       addToast({ type: 'error', title: 'Listing Not Found', message: 'Please go back and recreate your listing.' });
       return;
     }
+    if (files.length === 0) {
+      addToast({ type: 'warning', title: 'No Images', message: 'Please upload at least one image for CV verification.' });
+      return;
+    }
+    const categoryMap = {
+      Plastic: 'Plastic', Paper: 'Paper', Metal: 'Metal', Glass: 'Glass',
+      Organic: 'Other', 'E-Waste': 'Other', Textile: 'Other', Rubber: 'Other',
+    };
+    const declaredCategory    = categoryMap[wasteType] || 'Other';
+    const declaredSubcategory = subtype || null;
+    await analyse(files, declaredCategory, declaredSubcategory);
+  }
+
+  async function handleConfirmSubmit() {
+    if (!createdListing) return;
+    if (!visionResult) return;
+
     setLoading(true);
+    // Capture verdict BEFORE any async calls (clearVision would wipe it)
+    const verdict = visionResult.verdict;
+
     try {
-      if (files.length > 0) await listingsService.uploadImages(createdListing.id, files);
-      else await listingsService.submit(createdListing.id);
-      addToast({ type: 'success', title: 'Listing Submitted!', message: 'Your listing is pending verification.', duration: 5000 });
+      if (files.length > 0) {
+        await listingsService.uploadImages(createdListing.id, files);
+      }
+
+      if (verdict === 'verified') {
+        await listingsService.autoApprove(createdListing.id, visionResult);
+        console.log('✅ Listing auto-approved by CV module');
+      } else if (verdict === 'low_confidence') {
+        await listingsService.requestMoreImages(createdListing.id, visionResult);
+        console.log('⚠️ Listing pending — low confidence, more images needed');
+      } else {
+        await listingsService.update(createdListing.id, {
+          vision_confidence:  visionResult.confidence,
+          vision_quality:     visionResult.qualityScore,
+          vision_consistency: visionResult.consistencyScore,
+          vision_verdict:     visionResult.verdict,
+          vision_notes:       visionResult.notes,
+        });
+        console.log('❌ Listing flagged for manual review');
+      }
+
+      // DO NOT call clearVision() here — renderDoneStep reads visionResult
       setStep(4);
     } catch (e) {
-      addToast({ type: 'warning', title: 'Upload Issue', message: 'Images could not upload, but your listing was saved.' });
-      setStep(4);
+      console.error('❌ Submit failed:', e);
+      addToast({ type: 'error', title: 'Submission Failed', message: e.message || 'Please try again.' });
     } finally {
       setLoading(false);
     }
   }
 
+  // ── Reset ─────────────────────────────────────────────────────────────
+
   function reset() {
     setStep(1); setWasteType(''); setSubtype(''); setQty('');
     setCondition('clean'); setCollectionPoint('commercial'); setCounty('Nairobi');
-    setDistanceKm(5); setNotes(''); setSelectedPricePerKg(null);
+    setNotes(''); setSelectedPricePerKg(null);
     setManualPricePerKg(''); setPriceSource('ai'); setAiPricing(null);
     setLocation(''); setLat(null); setLng(null);
     setFiles([]); setPreviews([]); setCreatedListing(null); setFieldErrors({});
+    clearVision(); // moved here from handleConfirmSubmit
   }
 
   const formatKES = (amount) => `KES ${Math.round(amount).toLocaleString()}`;
 
-  const inputStyle = (fieldName) => ({
-    ...(fieldErrors[fieldName] ? {
-      borderColor: '#fca5a5',
-      background: '#fff8f8',
-      boxShadow: '0 0 0 3px rgba(239,68,68,0.08)',
-    } : {}),
-  });
-
-  // ── Render Steps ──────────────────────────────────────────────────────
+  // ── Render: Step 1 — Details ──────────────────────────────────────────
 
   const renderDetailsStep = () => (
     <div className="card">
@@ -477,9 +543,7 @@ export default function WasteListing({ onNavigate }) {
                 onClick={() => { setWasteType(wt.label); setSubtype(''); clearFieldError('wasteType'); }}
                 style={{
                   padding: '14px 8px 10px', cursor: 'pointer', textAlign: 'center',
-                  border: `2px solid ${tileBorder}`,
-                  borderRadius: 12,
-                  background: tileBg,
+                  border: `2px solid ${tileBorder}`, borderRadius: 12, background: tileBg,
                   transition: 'border-color 0.15s, background 0.15s, transform 0.1s',
                   transform: selected ? 'scale(1.03)' : 'scale(1)',
                   boxShadow: selected ? `0 4px 12px ${cfg?.color}30` : '0 1px 3px rgba(0,0,0,0.04)',
@@ -490,7 +554,9 @@ export default function WasteListing({ onNavigate }) {
                     : <SvgIcon size={32} d="M19 7l-.867 12.142A2 2 0 0 1 16.138 21H7.862a2 2 0 0 1-1.995-1.858L5 7m5 4v6m4-6v6M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3M4 7h16" color={iconColor} />
                   }
                 </div>
-                <div style={{ fontSize: 11.5, fontWeight: 600, color: selected ? cfg?.color : '#374151', letterSpacing: '0.01em' }}>{wt.label}</div>
+                <div style={{ fontSize: 11.5, fontWeight: 600, color: selected ? cfg?.color : '#374151', letterSpacing: '0.01em' }}>
+                  {wt.label}
+                </div>
               </div>
             );
           })}
@@ -512,8 +578,7 @@ export default function WasteListing({ onNavigate }) {
         <div className="form-group">
           <label className="form-label">Quantity (kg) *</label>
           <input
-            className="form-input"
-            type="number" min="0.1" step="0.1" value={qty}
+            className="form-input" type="number" min="0.1" step="0.1" value={qty}
             onChange={e => { setQty(e.target.value); clearFieldError('qty'); }}
             onBlur={e => { const err = validateQty(e.target.value); if (err) setFieldError('qty', err); }}
             placeholder="e.g., 50"
@@ -529,7 +594,7 @@ export default function WasteListing({ onNavigate }) {
         </div>
       </div>
 
-      {/* Location */}
+      {/* Location with Geoapify autocomplete */}
       <div className="form-group">
         <label className="form-label">Pickup Location *</label>
         <button
@@ -544,11 +609,10 @@ export default function WasteListing({ onNavigate }) {
             opacity: isLocating ? 0.7 : 1, transition: 'opacity 0.2s',
           }}
         >
-          {isLocating ? (
-            <><Icons.Loader /><span>Getting your location…</span></>
-          ) : (
-            <><Icons.Crosshair /><span>Use My Current Location</span></>
-          )}
+          {isLocating
+            ? <><Icons.Loader /><span>Getting your location…</span></>
+            : <><Icons.Crosshair /><span>Use My Current Location</span></>
+          }
         </button>
 
         <div style={{ position: 'relative' }} onClick={e => e.stopPropagation()}>
@@ -573,7 +637,10 @@ export default function WasteListing({ onNavigate }) {
                 const p = item.properties;
                 return (
                   <div key={p.place_id}
-                    onClick={() => { setLocation(p.formatted); setLat(p.lat); setLng(p.lon); setSuggestions([]); setShowSuggestions(false); clearFieldError('location'); }}
+                    onClick={() => {
+                      setLocation(p.formatted); setLat(p.lat); setLng(p.lon);
+                      setSuggestions([]); setShowSuggestions(false); clearFieldError('location');
+                    }}
                     style={{ padding: 10, cursor: 'pointer', borderBottom: '1px solid #eee', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}
                   >
                     <Icons.MapPin /><span>{p.formatted}</span>
@@ -591,8 +658,7 @@ export default function WasteListing({ onNavigate }) {
 
         {lat && lng && (
           <div style={{ fontSize: 11, color: '#2A6A2A', marginTop: 5, display: 'flex', alignItems: 'center', gap: 4, fontWeight: 500 }}>
-            <Icons.MapPin />
-            Coordinates: {lat.toFixed(6)}, {lng.toFixed(6)}
+            <Icons.MapPin />Coordinates: {lat.toFixed(6)}, {lng.toFixed(6)}
           </div>
         )}
         <FieldError message={fieldErrors.location} />
@@ -605,7 +671,7 @@ export default function WasteListing({ onNavigate }) {
         </select>
       </div>
 
-      {/* Collection Point */}
+      {/* Collection Point — card tiles with icons */}
       <div className="form-group">
         <label className="form-label">Collection Point Type *</label>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
@@ -632,8 +698,7 @@ export default function WasteListing({ onNavigate }) {
           })}
         </div>
         <div style={{ fontSize: 11, color: '#666', marginTop: 5, display: 'flex', alignItems: 'center', gap: 5 }}>
-          <Icons.TrendingUp />
-          Industrial and commercial waste gets better rates
+          <Icons.TrendingUp />Industrial and commercial waste gets better rates
         </div>
       </div>
 
@@ -649,6 +714,8 @@ export default function WasteListing({ onNavigate }) {
       </Button>
     </div>
   );
+
+  // ── Render: Step 2 — Pricing ──────────────────────────────────────────
 
   const renderPricingStep = () => (
     <div className="card">
@@ -703,17 +770,19 @@ export default function WasteListing({ onNavigate }) {
 
           {aiPricing.marketInfo?.advice && (
             <Alert type="info" style={{ marginBottom: 16, fontSize: 12 }}>
-              {aiPricing.marketInfo.advice}
+              💡 {aiPricing.marketInfo.advice}
             </Alert>
           )}
 
           <div style={{ marginBottom: 16 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12, cursor: 'pointer' }}>
-              <input type="radio" checked={priceSource === 'ai'} onChange={() => { setPriceSource('ai'); setSelectedPricePerKg(aiPricing.perKgRange?.recommended || aiPricing.priceRange?.recommended); }} />
+              <input type="radio" checked={priceSource === 'ai'}
+                onChange={() => { setPriceSource('ai'); setSelectedPricePerKg(aiPricing.perKgRange?.recommended || aiPricing.priceRange?.recommended); }} />
               <span>Use AI recommended price <strong>{formatKES(aiPricing.perKgRange?.recommended || aiPricing.priceRange?.recommended)}/kg</strong></span>
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
-              <input type="radio" checked={priceSource === 'manual'} onChange={() => { setPriceSource('manual'); setSelectedPricePerKg(null); }} />
+              <input type="radio" checked={priceSource === 'manual'}
+                onChange={() => { setPriceSource('manual'); setSelectedPricePerKg(null); }} />
               <span>Set my own price (KES/kg)</span>
             </label>
           </div>
@@ -721,8 +790,7 @@ export default function WasteListing({ onNavigate }) {
           {priceSource === 'manual' && (
             <div className="form-group">
               <label className="form-label">Your Price (KES per kg)</label>
-              <input
-                className="form-input" type="number" min="0" step="0.5" value={manualPricePerKg}
+              <input className="form-input" type="number" min="0" step="0.5" value={manualPricePerKg}
                 onChange={e => { const v = parseFloat(e.target.value); setManualPricePerKg(e.target.value); setSelectedPricePerKg(isNaN(v) ? null : v); }}
                 placeholder={`e.g., ${Math.round((aiPricing.perKgRange?.recommended || 13) * 0.9)}`}
               />
@@ -747,7 +815,9 @@ export default function WasteListing({ onNavigate }) {
         </div>
       ) : (
         <div>
-          <Alert type="warn" style={{ marginBottom: 16 }}>AI pricing temporarily unavailable. Please enter price manually.</Alert>
+          <Alert type="warn" style={{ marginBottom: 16 }}>
+            AI pricing temporarily unavailable. Please enter price manually.
+          </Alert>
           <div className="form-group">
             <label className="form-label">Your Price (KES per kg)</label>
             <input className="form-input" type="number" min="0" step="0.5" value={manualPricePerKg}
@@ -768,64 +838,250 @@ export default function WasteListing({ onNavigate }) {
     </div>
   );
 
-  const renderUploadStep = () => (
-    <div className="card">
-      <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Step 3 — Upload Photos</div>
-      <div style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>Upload up to 5 photos. Clear images improve matching speed.</div>
+  // ── Render: Step 3 — CV Photo Verification ────────────────────────────
 
-      <div
-        onDragOver={e => { e.preventDefault(); setDrag(true); }}
-        onDragLeave={() => setDrag(false)}
-        onDrop={handleDrop}
-        onClick={() => fileRef.current?.click()}
-        style={{
-          border: `2px dashed ${drag ? '#2A6A2A' : '#ddd'}`, borderRadius: '8px',
-          padding: '32px 20px', textAlign: 'center', cursor: 'pointer', marginBottom: 16,
-          background: drag ? '#f0f5ec' : '#fafaf8', transition: 'border-color 0.15s, background 0.15s',
-        }}>
-        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}><Icons.Camera /></div>
-        <div style={{ fontWeight: 600, fontSize: 14 }}>Drop images here or click to browse</div>
-        <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>PNG, JPG up to 10 MB each · Max 5 images</div>
-        <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => handleFile(e.target.files)} />
-      </div>
+  const renderUploadStep = () => {
+    const verdictConfig = {
+      verified:       { color: '#2A6A2A', bg: '#E8F5E9', label: 'Verified ✓',                       canSubmit: true  },
+      low_confidence: { color: '#7A5A00', bg: '#FFF8E1', label: 'Low Confidence — Add more images', canSubmit: false },
+      rejected:       { color: '#8A2020', bg: '#FFEBEE', label: 'Manual Review Required',            canSubmit: false },
+    };
+    const vc = visionResult ? verdictConfig[visionResult.verdict] : null;
 
-      {previews.length > 0 && (
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
-          {previews.map((src, i) => (
-            <div key={i} style={{ position: 'relative', width: 80, height: 80 }}>
-              <img src={src} alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8 }} />
-              <button onClick={() => removeFile(i)} style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', background: '#E05050', border: 'none', color: '#fff', fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Icons.X />
-              </button>
-            </div>
-          ))}
+    return (
+      <div className="card">
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Step 3 — Photo Verification</div>
+        <div style={{ fontSize: 13, color: '#666', marginBottom: 16 }}>
+          Upload photos of your waste. Our AI will verify the material type before submission.
+          This step is required and cannot be skipped.
         </div>
-      )}
 
-      <div style={{ display: 'flex', gap: 10 }}>
-        <Button variant="secondary" onClick={() => setStep(2)}>← Back to Price</Button>
-        <Button variant="primary" loading={loading} onClick={handleUploadImages}>
-          {files.length > 0 ? 'Upload & Submit' : 'Skip & Submit'}
-        </Button>
-      </div>
-    </div>
-  );
+        {/* Photo tips */}
+        {!visionResult && (
+          <div style={{ background: '#f0f5ec', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: 12, color: '#555' }}>
+            📸 <strong>Photo tips for best verification results:</strong>
+            <ul style={{ margin: '6px 0 0 16px', padding: 0 }}>
+              <li>Place material on a dark contrasting background</li>
+              <li>Fill at least 70% of the frame with the material</li>
+              <li>Upload 3–5 photos from different angles</li>
+              <li>Avoid backlighting and flash glare</li>
+            </ul>
+          </div>
+        )}
 
-  const renderDoneStep = () => (
-    <div className="card" style={{ textAlign: 'center', padding: '40px 24px' }}>
-      <div style={{ width: 64, height: 64, borderRadius: '50%', background: '#E0F0E0', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-        <Icons.CheckCircle />
+        {/* Upload zone */}
+        {!visionResult && (
+          <>
+            <div
+              onDragOver={e => { e.preventDefault(); setDrag(true); }}
+              onDragLeave={() => setDrag(false)}
+              onDrop={handleDrop}
+              onClick={() => fileRef.current?.click()}
+              style={{
+                border: `2px dashed ${drag ? '#2A6A2A' : '#ddd'}`, borderRadius: 8,
+                padding: '32px 20px', textAlign: 'center', cursor: 'pointer', marginBottom: 16,
+                background: drag ? '#f0f5ec' : '#fafaf8', transition: 'border-color 0.15s, background 0.15s',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}><Icons.Camera /></div>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>Drop images here or click to browse</div>
+              <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+                PNG, JPG · Upload 3–5 photos from different angles
+              </div>
+              <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
+                onChange={e => handleFile(e.target.files)} />
+            </div>
+
+            {previews.length > 0 && (
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+                {previews.map((src, i) => (
+                  <div key={i} style={{ position: 'relative', width: 80, height: 80 }}>
+                    <img src={src} alt="" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8 }} />
+                    <button
+                      onClick={e => { e.stopPropagation(); removeFile(i); }}
+                      style={{
+                        position: 'absolute', top: -6, right: -6, width: 20, height: 20,
+                        borderRadius: '50%', background: '#E05050', border: 'none',
+                        color: '#fff', fontSize: 12, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}
+                    >
+                      <Icons.X />
+                    </button>
+                  </div>
+                ))}
+                <div style={{ fontSize: 12, color: '#666', alignSelf: 'center' }}>
+                  {files.length} image{files.length > 1 ? 's' : ''} selected
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* CV loading */}
+        {visionLoading && (
+          <div style={{ textAlign: 'center', padding: '32px 0' }}>
+            <div className="loading-spinner" style={{ margin: '0 auto 12px', width: 32, height: 32 }} />
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#2A6A2A' }}>Running AI Verification…</div>
+            <div style={{ fontSize: 12, color: '#666', marginTop: 6 }}>
+              Analysing {files.length} image{files.length > 1 ? 's' : ''} across SM1 → SM2 → SM3 → SM4
+            </div>
+          </div>
+        )}
+
+        {/* CV error */}
+        {visionError && !visionLoading && (
+          <div style={{ background: '#FFEBEE', borderRadius: 8, padding: 14, marginBottom: 14, fontSize: 13, color: '#8A2020' }}>
+            ⚠️ Verification failed: {visionError}
+            <br />
+            <button onClick={() => clearVision()}
+              style={{ marginTop: 8, fontSize: 12, color: '#2A6A2A', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}>
+              Try again
+            </button>
+          </div>
+        )}
+
+        {/* CV result */}
+        {visionResult && !visionLoading && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{
+              background: vc.bg, border: `1px solid ${vc.color}`, borderRadius: 8,
+              padding: '12px 16px', marginBottom: 14,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: vc.color }}>{vc.label}</div>
+                <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
+                  Detected: <strong>{visionResult.detectedType}</strong>
+                  {visionResult.detectedSubtype && ` — ${visionResult.detectedSubtype}`}
+                </div>
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: vc.color }}>{visionResult.confidence}%</div>
+            </div>
+
+            {[
+              { label: 'Detection Confidence', value: visionResult.confidence },
+              { label: 'Quality Score',         value: visionResult.qualityScore },
+              { label: 'Batch Consistency',     value: visionResult.consistencyScore },
+            ].map(({ label, value }) => (
+              <div key={label} style={{ marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                  <span style={{ color: '#666' }}>{label}</span>
+                  <span style={{ fontWeight: 600, color: value < 65 ? '#C06010' : '#2A6A2A' }}>{value}%</span>
+                </div>
+                <div style={{ height: 6, background: '#eee', borderRadius: 3 }}>
+                  <div style={{ height: 6, borderRadius: 3, width: `${value}%`, background: value < 65 ? '#F59E0B' : '#2A6A2A' }} />
+                </div>
+              </div>
+            ))}
+
+            <div style={{ background: '#f5f5f5', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#555', marginTop: 10 }}>
+              {visionResult.notes}
+            </div>
+
+            {visionResult.verdict === 'rejected' && (
+              <div style={{ background: '#FFEBEE', borderRadius: 8, padding: '10px 12px', fontSize: 12, color: '#8A2020', marginTop: 10 }}>
+                This listing has been flagged for manual administrator review.
+                You can still submit — an admin will review the images before approval.
+              </div>
+            )}
+
+            {visionResult.verdict === 'low_confidence' && (
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontSize: 12, color: '#7A5A00', marginBottom: 8 }}>
+                  Add more photos from different angles to improve your confidence score.
+                </div>
+                <button onClick={() => clearVision()}
+                  style={{ fontSize: 12, color: '#2A6A2A', background: '#f0f5ec', border: '1px solid #2A6A2A', borderRadius: 6, padding: '6px 12px', cursor: 'pointer' }}>
+                  ← Add more photos
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Action buttons */}
+        <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+          <Button variant="secondary" onClick={() => setStep(2)}>← Back to Price</Button>
+
+          {!visionResult && !visionLoading && (
+            <Button variant="primary" loading={visionLoading}
+              disabled={files.length === 0 || visionLoading}
+              onClick={handleUploadImages}>
+              {files.length === 0
+                ? 'Upload images to verify'
+                : `Verify ${files.length} Image${files.length > 1 ? 's' : ''} with AI`}
+            </Button>
+          )}
+
+          {visionResult && !visionLoading && (
+            <Button variant="primary" loading={loading} onClick={handleConfirmSubmit}>
+              {visionResult.verdict === 'verified'
+                ? 'Confirm & Submit Listing →'
+                : 'Submit for Manual Review →'}
+            </Button>
+          )}
+        </div>
       </div>
-      <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Listing Submitted!</div>
-      <div style={{ color: '#666', fontSize: 14, marginBottom: 24 }}>
-        Your listing is pending verification. We'll notify you once it's approved.
+    );
+  };
+
+  // ── Render: Step 4 — Done ─────────────────────────────────────────────
+
+  const renderDoneStep = () => {
+    const wasAutoApproved = visionResult?.verdict === 'verified';
+    return (
+      <div className="card" style={{ textAlign: 'center', padding: '40px 24px' }}>
+        <div style={{
+          width: 64, height: 64, borderRadius: '50%',
+          background: wasAutoApproved ? '#E0F0E0' : '#FFF8E1',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 16px',
+        }}>
+          <Icon name="check" size={32} color={wasAutoApproved ? '#2A6A2A' : '#7A5A00'} strokeWidth={2.5} />
+        </div>
+
+        <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>
+          {wasAutoApproved ? 'Listing Auto-Approved! ✓' : 'Listing Submitted!'}
+        </div>
+
+        <div style={{ color: '#666', fontSize: 14, marginBottom: 16 }}>
+          {wasAutoApproved
+            ? 'Your listing passed AI verification and is now live on the marketplace.'
+            : visionResult?.verdict === 'low_confidence'
+              ? 'Your listing has been submitted for administrator review. You may be asked to provide additional images.'
+              : 'Your listing has been flagged for manual review. An administrator will verify it shortly.'}
+        </div>
+
+        {visionResult && (
+          <div style={{
+            background: wasAutoApproved ? '#E8F5E9' : '#FFF8E1',
+            border: `1px solid ${wasAutoApproved ? '#2A6A2A' : '#7A5A00'}`,
+            borderRadius: 8, padding: '12px 16px', marginBottom: 20, textAlign: 'left',
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 8 }}>CV Verification Summary</div>
+            {[
+              { label: 'Detection Confidence', value: visionResult.confidence },
+              { label: 'Quality Score',         value: visionResult.qualityScore },
+              { label: 'Batch Consistency',     value: visionResult.consistencyScore },
+            ].map(({ label, value }) => (
+              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                <span style={{ color: '#666' }}>{label}</span>
+                <span style={{ fontWeight: 600, color: value >= 85 ? '#2A6A2A' : '#7A5A00' }}>{value}%</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+          <Button variant="primary" onClick={reset}>List Another</Button>
+          <Button variant="secondary" onClick={() => onNavigate('dashboard')}>Dashboard</Button>
+        </div>
       </div>
-      <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
-        <Button variant="primary" onClick={reset}>List Another</Button>
-        <Button variant="secondary" onClick={() => onNavigate('dashboard')}>Dashboard</Button>
-      </div>
-    </div>
-  );
+    );
+  };
+
+  // ── Root render ───────────────────────────────────────────────────────
 
   return (
     <>
