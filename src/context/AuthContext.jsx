@@ -46,6 +46,7 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async ({ email, password }) => {
     setError(null);
+    // eslint-disable-next-line
     const u = await authService.login({ email, password });
     // After login, fetch full user with locations
     const fullUser = await usersService.getMe();
