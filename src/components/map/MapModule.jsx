@@ -332,12 +332,21 @@ function GeneratorListingsPanel({ loc, onClose, onGetDirections }) {
   const [successId, setSuccessId]     = useState(null); // id of listing request was sent for
 
   useEffect(() => {
-    if (!loc) return;
+  if (!loc) return;
+
+  // user_id is the FK on map_locations; users?.id is the merged user object
+  const sellerId = loc.user_id ?? loc.users?.id ?? loc.claimed_by_user_id;
+
+  if (!sellerId) {
+    setListings([]);
+    setLoading(false);
+    return;
+  }
     setLoading(true);
     setError(null);
     setActive(null);
     setSuccessId(null);
-    listingsService.getFeed({ seller_id: loc.user_id, status: 'verified', limit: 10 })
+    listingsService.getFeed({ seller_id: sellerId, status: 'verified', limit: 10 })
       .then(data => {
         const items = Array.isArray(data) ? data : data?.data ?? [];
         setListings(items);
