@@ -1,40 +1,48 @@
 import React, { useState, useEffect } from 'react';
 import { Badge, Spinner, EmptyState, Button } from '../common';
-
 import { transactionsService } from '../../services/index';
 import { useAuth } from '../../context/AuthContext';
 
-// Which status transitions each role can trigger from a given status
+// ── Who pays whom ─────────────────────────────────────────────────
+// Seller  = waste generator. Lists waste. RECEIVES cash from recycler.
+// Recycler = waste collector. Responds to listing. PAYS the seller & takes the waste.
+//
+// Flow:
+//   1. Recycler requests collection  (match created → initiated)
+//   2. Recycler arrives, pays seller, confirms pickup  (initiated → confirmed)
+//   3. Seller confirms they received payment & waste was taken  (confirmed → completed)
+//   4. Seller can cancel before recycler confirms
+//   5. Either party can dispute after confirmation
+
 const STATUS_TRANSITIONS = {
-  seller:   {
-    initiated: ['cancelled'],
-    confirmed: ['disputed'],
-    completed: [],
-    cancelled: [],
-    disputed:  [],
+  seller: {
+    initiated:  ['cancelled'],              // seller can cancel before recycler confirms
+    confirmed:  ['completed', 'disputed'],  // seller confirms received payment + waste collected
+    completed:  [],
+    cancelled:  [],
+    disputed:   ['completed'],              // seller can resolve a dispute
   },
   recycler: {
-    initiated: ['confirmed', 'cancelled'],
-    confirmed: ['completed'],
-    completed: [],
-    cancelled: [],
-    disputed:  ['completed'],
+    initiated:  ['confirmed', 'cancelled'], // recycler confirms pickup & payment
+    confirmed:  ['disputed'],               // recycler can dispute if something is wrong
+    completed:  [],
+    cancelled:  [],
+    disputed:   ['completed'],              // recycler can resolve a dispute
   },
 };
 
-// Human-readable labels for action buttons
 const ACTION_LABELS = {
-  confirmed:  'Confirm Pickup',
-  completed:  'Mark as Paid & Collected',
+  confirmed:  'Confirm Pickup & Payment',   // recycler: I arrived, paid, and collected
+  completed:  'Confirm Received & Done',    // seller: I received payment, waste is gone
   cancelled:  'Cancel',
   disputed:   'Raise Dispute',
 };
 
-// Confirmation prompts shown before sensitive transitions
 const ACTION_CONFIRM = {
-  completed: 'Confirm that cash payment has been made and waste has been collected?',
-  cancelled: 'Are you sure you want to cancel this transaction?',
-  disputed:  'Are you sure you want to raise a dispute on this transaction?',
+  confirmed:  'Confirm that you have arrived, paid the seller, and collected the waste?',
+  completed:  'Confirm that you have received the cash payment and the waste has been collected by the recycler?',
+  cancelled:  'Are you sure you want to cancel this transaction?',
+  disputed:   'Are you sure you want to raise a dispute on this transaction?',
 };
 
 const STATUS_COLOR = {
@@ -46,26 +54,51 @@ const STATUS_COLOR = {
   cancelled:  'gray',
 };
 
-// Human-readable status labels shown in the badge
 const STATUS_LABELS = {
   initiated:  'Initiated',
   confirmed:  'Pickup Confirmed',
-  completed:  'Paid & Collected',
+  completed:  'Completed',
   disputed:   'Disputed',
   cancelled:  'Cancelled',
 };
 
-// ─── Rating Modal ────────────────────────────────────────────────────────────
+// ── Role context banners ──────────────────────────────────────────
+const ROLE_INFO = {
+  seller: (
+    <>
+      <strong>Your role:</strong>&nbsp;
+      You listed the waste. The recycler will come to collect it and
+      <strong> pay you cash on pickup</strong>. Once the recycler confirms they've
+      collected the waste and paid you, click <strong>Confirm Received &amp; Done</strong>
+      to complete the transaction. You can cancel before the recycler confirms pickup.
+    </>
+  ),
+  recycler: (
+    <>
+      <strong>Your role:</strong>&nbsp;
+      You requested to collect this waste. When you arrive at the seller's location,
+      <strong> pay the seller the agreed amount in cash</strong>, collect the waste,
+      then click <strong>Confirm Pickup &amp; Payment</strong>. The seller will then
+      confirm receipt and close the transaction.
+    </>
+  ),
+};
 
+// ─── Rating Modal ─────────────────────────────────────────────────
 function RatingModal({ tx, user, onClose, onDone }) {
   const [score, setScore]     = useState(5);
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const rateeId = user.id === tx.seller_id ? tx.recycler_id : tx.seller_id;
-  const rateeName = user.id === tx.seller_id
+  // Seller rates the recycler; recycler rates the seller
+  const isSeller  = user.id === tx.seller_id;
+  const rateeId   = isSeller ? tx.recycler_id : tx.seller_id;
+  const rateeName = isSeller
     ? (tx.recycler?.full_name || 'the recycler')
     : (tx.seller?.full_name   || 'the seller');
+
+  // Safety guard — should never happen, but prevents self-rating
+  if (rateeId === user.id) return null;
 
   async function submit() {
     setLoading(true);
@@ -81,10 +114,8 @@ function RatingModal({ tx, user, onClose, onDone }) {
 
   return (
     <div style={{
-      position: 'fixed', inset: 0,
-      background: 'rgba(0,0,0,0.45)',
-      zIndex: 1000,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+      zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       <div className="card" style={{ width: 400, padding: 28 }}>
         <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>
@@ -94,7 +125,6 @@ function RatingModal({ tx, user, onClose, onDone }) {
           How was your experience with {rateeName}?
         </div>
 
-        {/* Score selector */}
         <div className="form-group">
           <label className="form-label">Score</label>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -104,13 +134,10 @@ function RatingModal({ tx, user, onClose, onDone }) {
                 onClick={() => setScore(n)}
                 title={['Poor', 'Fair', 'Good', 'Great', 'Excellent'][n - 1]}
                 style={{
-                  width: 44, height: 44,
-                  borderRadius: 10,
+                  width: 44, height: 44, borderRadius: 10,
                   border: `2px solid ${score === n ? 'var(--olive)' : 'var(--border)'}`,
                   background: score === n ? 'var(--olive-bg)' : 'var(--white)',
-                  cursor: 'pointer',
-                  fontWeight: 700,
-                  fontSize: 16,
+                  cursor: 'pointer', fontWeight: 700, fontSize: 16,
                   color: score === n ? 'var(--olive-deep)' : 'var(--text)',
                   transition: 'all 0.15s',
                 }}
@@ -124,13 +151,13 @@ function RatingModal({ tx, user, onClose, onDone }) {
           </div>
         </div>
 
-        {/* Comment */}
         <div className="form-group">
-          <label className="form-label">Comment <span style={{ fontWeight: 400, color: 'var(--text3)' }}>(optional)</span></label>
+          <label className="form-label">
+            Comment&nbsp;
+            <span style={{ fontWeight: 400, color: 'var(--text3)' }}>(optional)</span>
+          </label>
           <textarea
-            className="form-input"
-            rows={3}
-            value={comment}
+            className="form-input" rows={3} value={comment}
             onChange={e => setComment(e.target.value)}
             placeholder="Share any feedback about this transaction…"
           />
@@ -145,23 +172,20 @@ function RatingModal({ tx, user, onClose, onDone }) {
   );
 }
 
-// ─── Transaction Status Timeline ─────────────────────────────────────────────
-
+// ─── Status Timeline ──────────────────────────────────────────────
 function StatusTimeline({ status }) {
-  const steps = ['initiated', 'confirmed', 'completed'];
+  const steps       = ['initiated', 'confirmed', 'completed'];
   const terminalNeg = status === 'cancelled' || status === 'disputed';
-  const currentIdx = steps.indexOf(status);
+  const currentIdx  = steps.indexOf(status);
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 0, fontSize: 11 }}>
       {steps.map((step, i) => {
-        const done    = !terminalNeg && currentIdx >= i;
-        const active  = !terminalNeg && currentIdx === i;
+        const done   = !terminalNeg && currentIdx >= i;
+        const active = !terminalNeg && currentIdx === i;
         return (
           <React.Fragment key={step}>
-            <div style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
-            }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
               <div style={{
                 width: 10, height: 10, borderRadius: '50%',
                 background: done ? 'var(--olive)' : 'var(--border)',
@@ -189,8 +213,34 @@ function StatusTimeline({ status }) {
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+// ─── Next Action hint ─────────────────────────────────────────────
+function NextActionHint({ status, role }) {
+  const hints = {
+    seller: {
+      initiated:  '⏳ Waiting for recycler to arrive, pay you, and confirm pickup',
+      confirmed:  '👆 Your turn — confirm you received payment and waste was collected',
+      completed:  '✅ Transaction complete',
+      cancelled:  '❌ Cancelled',
+      disputed:   '⚠️ Under dispute — you can resolve or wait for admin review',
+    },
+    recycler: {
+      initiated:  '👆 Your turn — go to the seller, pay them, collect the waste, then confirm pickup',
+      confirmed:  '⏳ Waiting for seller to confirm they received payment',
+      completed:  '✅ Transaction complete',
+      cancelled:  '❌ Cancelled',
+      disputed:   '⚠️ Under dispute — you can resolve or wait for admin review',
+    },
+  };
+  const hint = hints[role]?.[status];
+  if (!hint) return null;
+  return (
+    <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 6 }}>
+      {hint}
+    </div>
+  );
+}
 
+// ─── Main Component ───────────────────────────────────────────────
 export default function Transactions() {
   const { user } = useAuth();
   const role = user?.role || 'seller';
@@ -207,17 +257,19 @@ export default function Transactions() {
     Promise.all([
       transactionsService.getAll(),
       transactionsService.getStats(),
-    ]).then(([txData, statsData]) => {
-      setTxs(Array.isArray(txData) ? txData : txData?.data ?? []);
-      setStats(statsData);
-    }).catch(() => {}).finally(() => setLoading(false));
+    ])
+      .then(([txData, statsData]) => {
+        setTxs(Array.isArray(txData) ? txData : txData?.data ?? []);
+        setStats(statsData);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   const filtered = filter === 'all'
     ? transactions
     : transactions.filter(t => t.status === filter);
 
-  // Handle status transition with optional confirmation prompt
   async function handleTransition(txId, newStatus) {
     const confirmMsg = ACTION_CONFIRM[newStatus];
     if (confirmMsg && !window.confirm(confirmMsg)) return;
@@ -233,7 +285,6 @@ export default function Transactions() {
     }
   }
 
-  // Called when a rating is submitted — patch local state so Rate button disappears
   function handleRatingDone(txId) {
     setRatingTx(null);
     setTxs(prev => prev.map(t =>
@@ -243,7 +294,6 @@ export default function Transactions() {
     ));
   }
 
-  // Check if current user has already rated a transaction
   function hasRated(tx) {
     return !!(tx.ratings || []).find(r => r.rater_id === user?.id);
   }
@@ -261,8 +311,6 @@ export default function Transactions() {
             Your complete recycling &amp; payout history
           </div>
         </div>
-
-        {/* Filter tabs */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {filterLabels.map(f => (
             <button
@@ -276,13 +324,13 @@ export default function Transactions() {
         </div>
       </div>
 
-      {/* Stats strip */}
+      {/* Stats */}
       {stats && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
           {[
-            { label: 'Total',       val: stats.total     || 0 },
-            { label: 'Completed',   val: stats.completed || 0 },
-            { label: 'Pending',     val: stats.pending   || 0 },
+            { label: 'Total',       val: stats.total      || 0 },
+            { label: 'Completed',   val: stats.completed  || 0 },
+            { label: 'Pending',     val: stats.pending    || 0 },
             { label: 'Total Value', val: `KES ${(stats.totalValue || 0).toLocaleString()}` },
           ].map((s, i) => (
             <div key={i} className="stat-card">
@@ -293,30 +341,54 @@ export default function Transactions() {
         </div>
       )}
 
-      {/* How it works — cash flow explainer */}
+      {/* Role info banner */}
       <div style={{
-        background: 'var(--olive-bg)',
-        border: '1px solid var(--olive-pale)',
-        borderRadius: 10,
-        padding: '12px 16px',
-        marginBottom: 20,
-        fontSize: 13,
-        color: 'var(--olive-deep)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
+        background: 'var(--olive-bg)', border: '1px solid var(--olive-pale)',
+        borderRadius: 10, padding: '12px 16px', marginBottom: 20,
+        fontSize: 13, color: 'var(--olive-deep)',
+        display: 'flex', alignItems: 'flex-start', gap: 10,
       }}>
-        <span style={{ fontSize: 18 }}>💡</span>
-        <span>
-          <strong>Cash-on-pickup flow:</strong>&nbsp;
-          {role === 'seller'
-            ? 'Recyclers confirm pickup and mark transactions complete once cash is paid and waste collected. You can raise a dispute if something goes wrong.'
-            : 'Confirm pickup when agreed, then mark complete once you\'ve paid cash and collected the waste.'
-          }
-        </span>
+        <span style={{ fontSize: 18, flexShrink: 0 }}>💡</span>
+        <span>{ROLE_INFO[role]}</span>
       </div>
 
-      {/* Table */}
+      {/* Flow explainer */}
+      <div style={{
+        background: '#f9f9f7', border: '1px solid var(--border)',
+        borderRadius: 10, padding: '12px 16px', marginBottom: 20,
+        fontSize: 12, color: 'var(--text2)',
+      }}>
+        <strong style={{ fontSize: 13 }}>How the flow works:</strong>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          {[
+            { step: '1', label: 'Seller lists waste on marketplace',          who: 'seller'   },
+            { step: '→' },
+            { step: '2', label: 'Recycler arrives, pays seller & confirms',   who: 'recycler' },
+            { step: '→' },
+            { step: '3', label: 'Seller confirms payment received & done',    who: 'seller'   },
+          ].map((item, i) => (
+            item.step === '→'
+              ? <span key={i} style={{ color: 'var(--text3)', fontSize: 16 }}>→</span>
+              : (
+                <div key={i} style={{
+                  background: item.who === 'seller' ? '#e8f5e9' : '#e3f2fd',
+                  border: `1px solid ${item.who === 'seller' ? '#c8e0c8' : '#b3d4f5'}`,
+                  borderRadius: 6, padding: '5px 10px', fontSize: 11,
+                }}>
+                  <strong>Step {item.step}</strong> — {item.label}
+                  <span style={{
+                    marginLeft: 6, fontSize: 10, fontWeight: 600,
+                    color: item.who === 'seller' ? '#2A6A2A' : '#1565c0',
+                  }}>
+                    [{item.who}]
+                  </span>
+                </div>
+              )
+          ))}
+        </div>
+      </div>
+
+      {/* Transactions table */}
       {loading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
           <Spinner size={32} />
@@ -338,10 +410,7 @@ export default function Transactions() {
               <thead>
                 <tr style={{ borderBottom: '2px solid var(--border)', textAlign: 'left' }}>
                   {['Waste Type', 'Qty', 'Amount', 'Counterparty', 'Status', 'Date', 'Actions'].map(h => (
-                    <th
-                      key={h}
-                      style={{ padding: '8px 12px', color: 'var(--text3)', fontWeight: 600, whiteSpace: 'nowrap' }}
-                    >
+                    <th key={h} style={{ padding: '8px 12px', color: 'var(--text3)', fontWeight: 600, whiteSpace: 'nowrap' }}>
                       {h}
                     </th>
                   ))}
@@ -351,7 +420,8 @@ export default function Transactions() {
                 {filtered.map((tx) => {
                   const allowed      = STATUS_TRANSITIONS[role]?.[tx.status] || [];
                   const counterparty = role === 'seller' ? tx.recycler : tx.seller;
-                  const canRate      = tx.status === 'completed' && !hasRated(tx);
+                  // Only recycler rates — they received a service (waste collection + payment)
+                  const canRate = tx.status === 'completed' && role === 'recycler' && !hasRated(tx); 
 
                   return (
                     <tr key={tx.id} style={{ borderBottom: '1px solid var(--border)' }}>
@@ -362,26 +432,39 @@ export default function Transactions() {
                           {tx.waste_type || tx.listing?.waste_type}
                         </div>
                         {tx.listing?.subtype && (
-                          <div style={{ color: 'var(--text3)', fontSize: 11 }}>
-                            {tx.listing.subtype}
-                          </div>
+                          <div style={{ color: 'var(--text3)', fontSize: 11 }}>{tx.listing.subtype}</div>
                         )}
                       </td>
 
                       {/* Qty */}
                       <td style={{ padding: '12px' }}>{tx.quantity_kg} kg</td>
 
-                      {/* Amount */}
-                      <td style={{ padding: '12px', fontWeight: 600 }}>
-                        KES {Number(tx.total_amount || 0).toLocaleString()}
+                      {/* Amount — seller receives, recycler pays */}
+                      <td style={{ padding: '12px' }}>
+                        <div style={{ fontWeight: 600 }}>
+                          KES {Number(tx.total_amount || 0).toLocaleString()}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text3)' }}>
+                          {role === 'seller' ? '↓ you receive' : '↑ you pay'}
+                        </div>
                       </td>
 
                       {/* Counterparty */}
                       <td style={{ padding: '12px' }}>
-                        {counterparty?.full_name || '—'}
+                        <div style={{ fontWeight: 500 }}>{counterparty?.full_name || '—'}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text3)' }}>
+                          {role === 'seller' ? 'Recycler' : 'Seller'}
+                        </div>
+                        {counterparty?.phone && (
+                          <a href={`tel:${counterparty.phone}`} style={{
+                            fontSize: 11, color: '#2A6A2A', textDecoration: 'none', display: 'block',
+                          }}>
+                            📞 {counterparty.phone}
+                          </a>
+                        )}
                       </td>
 
-                      {/* Status + timeline */}
+                      {/* Status + timeline + hint */}
                       <td style={{ padding: '12px' }}>
                         <Badge color={STATUS_COLOR[tx.status] || 'gray'}>
                           {STATUS_LABELS[tx.status] || tx.status}
@@ -389,6 +472,7 @@ export default function Transactions() {
                         <div style={{ marginTop: 8 }}>
                           <StatusTimeline status={tx.status} />
                         </div>
+                        <NextActionHint status={tx.status} role={role} />
                       </td>
 
                       {/* Date */}
@@ -418,10 +502,7 @@ export default function Transactions() {
                           ))}
 
                           {canRate && (
-                            <button
-                              className="btn btn-sm btn-secondary"
-                              onClick={() => setRatingTx(tx)}
-                            >
+                            <button className="btn btn-sm btn-secondary" onClick={() => setRatingTx(tx)}>
                               ⭐ Rate
                             </button>
                           )}
@@ -433,6 +514,7 @@ export default function Transactions() {
                           )}
                         </div>
                       </td>
+
                     </tr>
                   );
                 })}
@@ -442,7 +524,6 @@ export default function Transactions() {
         </div>
       )}
 
-      {/* Rating modal */}
       {ratingTx && (
         <RatingModal
           tx={ratingTx}
