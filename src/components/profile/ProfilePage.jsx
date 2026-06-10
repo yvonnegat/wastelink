@@ -4,7 +4,7 @@ import {
   Building2, Phone, Mail, User, MapPin, Clock, Star,
   Camera, Edit2, Lock, Bell, Trash2, Calendar, Check, X,
   Recycle, Package, FileText, Globe, ChevronDown, AlertCircle,
-  LogOut
+  Eye, EyeOff, LogOut
 } from 'lucide-react';
 
 import { useAuth } from '../../context/AuthContext';
@@ -12,6 +12,9 @@ import { usersService, locationService } from '../../services';
 import LocationAutocomplete from '../map/LocationAutocomplete';
 import { NearbySeededCentrePrompt } from '../map/NearbySeededCentrePrompt';
 import { useToast } from '../common/Toast';
+import ChangePasswordModal from '../common/ChangePasswordModal';
+import DeleteAccountModal  from '../common/DeleteAccountModal';
+import { authService } from '../../services';
 
 import './ProfilePage.css';
 
@@ -92,6 +95,8 @@ export default function ProfilePage() {
   const [saving,  setSaving]  = useState(false);
   const [msg,     setMsg]     = useState('');
   const [error,   setError]   = useState('');
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [showDeleteAccount,  setShowDeleteAccount]  = useState(false);
 
   // Nearby seeded centre prompt (recyclers only)
   const [nearbySeeded,   setNearbySeeded]   = useState(null);
@@ -412,7 +417,12 @@ export default function ProfilePage() {
           }}
         />
       )}
-
+      {showChangePassword && (
+  <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
+)}
+{showDeleteAccount && (
+  <DeleteAccountModal onClose={() => setShowDeleteAccount(false)} />
+)}
       <div className="profile-page-hd">
         <div className="profile-page-hd-left">
           <div className="page-heading">My Profile</div>
@@ -883,9 +893,23 @@ export default function ProfilePage() {
           <div className="section-card">
             <div className="section-card-hd"><span className="section-card-title">Account</span></div>
             <ul className="account-list">
-              <li className="account-item"><span className="account-item-icon"><Lock size={15}/></span>Change Password</li>
-              <li className="account-item"><span className="account-item-icon"><Bell size={15}/></span>Notification Settings</li>
-              <li className="account-item danger"><span className="account-item-icon"><Trash2 size={15}/></span>Delete Account</li>
+              <li
+                className="account-item"
+                style={{ cursor: 'pointer' }}
+                onClick={() => setShowChangePassword(true)}
+              >
+                <span className="account-item-icon"><Lock size={15}/></span>Change Password
+              </li>
+              <li className="account-item">
+                <span className="account-item-icon"><Bell size={15}/></span>Notification Settings
+              </li>
+              <li
+                className="account-item danger"
+                style={{ cursor: 'pointer' }}
+                onClick={() => setShowDeleteAccount(true)}
+              >
+                <span className="account-item-icon"><Trash2 size={15}/></span>Delete Account
+              </li>
             </ul>
           </div>
         </div>

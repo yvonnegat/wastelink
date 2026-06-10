@@ -69,4 +69,12 @@ export const usersService = {
     formData.append('avatar', file);
     return api.upload('/users/me/avatar', formData);
   },
+    deleteAccount: async () => {
+    try {
+      const response = await api.delete('/users/account'); // Adjust endpoint as needed
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Failed to delete account');
+    }
+  },
 };
